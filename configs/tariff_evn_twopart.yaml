@@ -1,9 +1,13 @@
-# Regime D capacity charge, as named in the design doc.
-# TODO verify 209459–286153 VND/kW/month against the source decision before any bill is computed.
-# Energy windows live in tariff_evn_2026.yaml and are not repeated here.
+# EVN two-part capacity charge from the October 2025 paper trial.
+# Source: https://vietnamnet.vn/thu-nghiem-gia-dien-moi-tu-thang-10-bat-ngo-muc-gia-843-dong-so-dien-2451336.html
+# The article's voltage split, VND per kW per month:
+#   >=110 kV 209459; 22–110 kV 235414; 6–22 kV 240050; <6 kV 286153.
+# low/high is that full span. The bill uses the 22–110 kV figure, which is the 22 kV class
+# inside the span. This trial was on paper and was not yet the invoice rate.
 timezone: Asia/Ho_Chi_Minh
 currency: VND
-rate_status: placeholder
+rate_status: filed
 capacity_charge_vnd_per_kw_month:
-  low: 209459  # TODO verify
-  high: 286153  # TODO verify
+  low: 209459
+  high: 286153
+  kv22_to_110: 235414

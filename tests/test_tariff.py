@@ -1,4 +1,4 @@
-"""Golden tariff day and schema checks for the placeholder rate cards."""
+"""Golden tariff day and schema checks for the filed SCE and EVN rate cards."""
 
 from __future__ import annotations
 
@@ -49,6 +49,7 @@ def test_shipped_tariffs_and_site_load() -> None:
     validate_tariff(load_tariff(SCE))
     evn = load_tariff(EVN)
     validate_tariff(evn)
+    sce = load_tariff(SCE)
     site = load_config(SITE).model_dump()
     assert site["evse_count"] == 54
     assert site["dcfc_count"] == 1
@@ -56,9 +57,20 @@ def test_shipped_tariffs_and_site_load() -> None:
     assert site["site_cap_kw"] == 150
     assert site["timezone"] == "America/Los_Angeles"
     assert site["evse_power_default_kw"] == 6.7
+    assert sce.demand_charge_per_kw_month == 15.51
+    summer = tariff_profile(sce, date(2019, 7, 16))
+    assert summer[12] == pytest.approx(0.26668)
+    assert summer[0] == pytest.approx(0.05623)
 
 
-def test_evn_peak_window_skips_sunday() -> None:
+def test_evn_peak_bounds_are_q963() -> None:
+    cfg = load_tariff(EVN)
+    peaks = [window for window in cfg.windows if window.name == "peak"]
+    assert len(peaks) == 1
+    assert peaks[0].start == "17:30"
+    assert peaks[0].end == "22:30"
+    assert "sun" not in peaks[0].days
+    assert set(peaks[0].days) == {"mon", "tue", "wed", "thu", "fri", "sat"}
     cfg = load_tariff(EVN)
     tiers = {}
     for window in cfg.windows:
@@ -115,6 +127,24 @@ def test_overlap_gap_price_and_order_fail() -> None:
     )
     with pytest.raises(ValueError, match="order"):
         validate_tariff(inverted)
+
+
+def test_nonpositive_demand_and_implausible_price_fail() -> None:
+    sce = load_tariff(SCE)
+    sce.demand_charge_per_kw_month = 0
+    with pytest.raises(ValueError, match="demand"):
+        validate_tariff(sce)
+    wild = _covered_week()
+    wild.currency = "USD"
+    wild.windows[0] = TariffWindow(
+        name="off_peak",
+        start="00:00",
+        end="08:00",
+        days=["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+        price_per_kwh=10.0,
+    )
+    with pytest.raises(ValueError, match="plausibility"):
+        validate_tariff(wild)
 
 
 def test_config_hash_and_provenance_keys() -> None:

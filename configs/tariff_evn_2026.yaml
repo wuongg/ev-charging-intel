@@ -1,33 +1,36 @@
-# Decision 963/2026 structure from the day-1 brief.
-# Peak 17:30–22:30 Monday–Saturday (T2–T7). Sunday has no peak.
-# Off-peak 00:00–06:00. Everything else is normal.
-# TODO verify QĐ 963 — price_per_kwh values are PLACEHOLDERS, not the decision's VND/kWh.
+# QĐ 963/QĐ-BCT (22 April 2026) sets the clock. Energy numbers are the EVN
+# two-part trial bands reported for October 2025, not a single voltage class.
+# Windows: https://static.luatvietnam.vn/xem-file-quyet-dinh-963-qd-bct-2026-ve-khung-gio-cao-diem-thap-diem-va-gio-binh-thuong-he-thong-dien-quoc-gia-433067-d1/uploaded/vietlawfile/2026/04/24/963_qd_bct_090042.pdf.aspx
+# Energy bands: https://vietnamnet.vn/thu-nghiem-gia-dien-moi-tu-thang-10-bat-ngo-muc-gia-843-dong-so-dien-2451336.html
+# Off-peak band 843–904, normal band 1253–1332, peak band 2162–2251 VND/kWh.
+# The scheduled price is the low end of off-peak and normal, and the high end of peak,
+# which are the endpoints named in the Day-4 brief (843 and 2251) plus the published normal floor.
 timezone: Asia/Ho_Chi_Minh
 currency: VND
-rate_status: placeholder
+rate_status: filed
 windows:
   - name: off_peak
     start: "00:00"
     end: "06:00"
     days: [mon, tue, wed, thu, fri, sat, sun]
-    price_per_kwh: 1000  # PLACEHOLDER — TODO verify QĐ 963
+    price_per_kwh: 843
   - name: normal
     start: "06:00"
     end: "17:30"
     days: [mon, tue, wed, thu, fri, sat]
-    price_per_kwh: 2000  # PLACEHOLDER — TODO verify QĐ 963
+    price_per_kwh: 1253
   - name: peak
     start: "17:30"
     end: "22:30"
-    days: [mon, tue, wed, thu, fri, sat]  # T2–T7; Sunday is not a peak day
-    price_per_kwh: 3000  # PLACEHOLDER — TODO verify QĐ 963
+    days: [mon, tue, wed, thu, fri, sat]
+    price_per_kwh: 2251
   - name: normal
     start: "22:30"
     end: "24:00"
     days: [mon, tue, wed, thu, fri, sat]
-    price_per_kwh: 2000  # PLACEHOLDER — TODO verify QĐ 963
+    price_per_kwh: 1253
   - name: normal
     start: "06:00"
     end: "24:00"
-    days: [sun]  # CN: no peak
-    price_per_kwh: 2000  # PLACEHOLDER — TODO verify QĐ 963
+    days: [sun]
+    price_per_kwh: 1253

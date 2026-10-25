@@ -64,6 +64,7 @@ class TariffWindow(BaseModel):
     end: str
     days: list[str]
     price_per_kwh: float
+    months: list[int] | None = None
 
 
 class TariffConfig(BaseModel):
@@ -73,6 +74,17 @@ class TariffConfig(BaseModel):
     currency: str
     windows: list[TariffWindow] = Field(min_length=1)
     rate_status: str | None = None
+    demand_charge_per_kw_month: float | None = None
+
+
+_PLAUSIBLE = {
+    "USD": (0.01, 2.0),
+    "VND": (100.0, 20_000.0),
+}
+_DEMAND_PLAUSIBLE = {
+    "USD": (0.0, 80.0),
+    "VND": (0.0, 1_000_000.0),
+}
 
 
 def canonical_day(value: str) -> str:
@@ -103,6 +115,16 @@ def parse_hhmm(value: str) -> int:
     return hour * 60 + minute
 
 
+def _window_months(window: TariffWindow) -> range | list[int]:
+    if window.months is None:
+        return list(range(1, 13))
+    return window.months
+
+
+def _price_band(currency: str) -> tuple[float, float] | None:
+    return _PLAUSIBLE.get(currency.strip().upper())
+
+
 def validate_tariff(cfg: TariffConfig) -> None:
     """Raise ValueError when windows overlap, leave a gap, or break price order."""
     errors: list[str] = []
@@ -113,61 +135,79 @@ def validate_tariff(cfg: TariffConfig) -> None:
     except Exception:
         errors.append(f"timezone: {cfg.timezone!r} is not an IANA zone")
 
-    covered = {day: [False] * (24 * 60) for day in DAY_NAMES}
-    tier_prices: dict[str, list[float]] = {"off_peak": [], "normal": [], "peak": []}
+    band = _price_band(cfg.currency)
+    if cfg.demand_charge_per_kw_month is not None:
+        demand = cfg.demand_charge_per_kw_month
+        demand_band = _DEMAND_PLAUSIBLE.get(cfg.currency.strip().upper())
+        if not isinstance(demand, (int, float)) or isinstance(demand, bool) or demand <= 0:
+            errors.append("demand_charge must be > 0")
+        elif demand_band is not None and not (demand_band[0] < demand <= demand_band[1]):
+            errors.append(f"demand_charge {demand} outside plausibility band {demand_band}")
 
-    for window in cfg.windows:
-        price = window.price_per_kwh
-        if isinstance(price, bool) or not isinstance(price, (int, float)) or price <= 0:
-            errors.append(f"price: {window.name} price_per_kwh must be > 0")
-        tier = canonical_tier(window.name)
-        if tier in tier_prices and isinstance(price, (int, float)) and not isinstance(price, bool):
-            tier_prices[tier].append(float(price))
-        try:
-            start = parse_hhmm(window.start)
-            end = parse_hhmm(window.end)
-        except ValueError as exc:
-            errors.append(str(exc))
-            continue
-        if end <= start:
-            errors.append(
-                f"overlap: {window.name} must not cross or invert midnight "
-                f"({window.start}->{window.end}); split the window"
-            )
-            continue
-        try:
-            days = [canonical_day(day) for day in window.days]
-        except ValueError as exc:
-            errors.append(str(exc))
-            continue
-        for day in days:
-            for minute in range(start, end):
-                if covered[day][minute]:
-                    errors.append(f"overlap: {day} minute {minute} covered twice ({window.name})")
-                    break
-                covered[day][minute] = True
+    seasonal = any(window.months is not None for window in cfg.windows)
+    month_groups: list[int | None] = list(range(1, 13)) if seasonal else [None]
 
-    for day, slots in covered.items():
-        if not all(slots):
-            missing = slots.index(False)
-            errors.append(f"gap: {day} missing minute {missing}")
-
-    for tier, prices in tier_prices.items():
-        if not prices:
-            errors.append(f"order: missing tier {tier}")
-    if tier_prices["off_peak"] and tier_prices["normal"] and tier_prices["peak"]:
-        off_max = max(tier_prices["off_peak"])
-        normal_min = min(tier_prices["normal"])
-        normal_max = max(tier_prices["normal"])
-        peak_min = min(tier_prices["peak"])
-        if not (off_max < normal_min < peak_min and normal_max < peak_min):
-            errors.append(
-                "order: require off-peak < normal < peak "
-                f"(off<={off_max}, normal=[{normal_min}, {normal_max}], peak>={peak_min})"
-            )
+    for month in month_groups:
+        covered = {day: [False] * (24 * 60) for day in DAY_NAMES}
+        tier_prices: dict[str, list[float]] = {"off_peak": [], "normal": [], "peak": []}
+        label = "all" if month is None else f"month {month}"
+        for window in cfg.windows:
+            if month is not None and month not in _window_months(window):
+                continue
+            if window.months is not None:
+                for item in window.months:
+                    if item < 1 or item > 12:
+                        errors.append(f"months: {window.name} has month {item}")
+            price = window.price_per_kwh
+            if isinstance(price, bool) or not isinstance(price, (int, float)) or price <= 0:
+                errors.append(f"price: {window.name} price_per_kwh must be > 0")
+            elif band is not None and not (band[0] <= float(price) <= band[1]):
+                errors.append(f"price: {window.name} {price} outside plausibility band {band}")
+            tier = canonical_tier(window.name)
+            if tier in tier_prices and isinstance(price, (int, float)) and not isinstance(price, bool):
+                tier_prices[tier].append(float(price))
+            try:
+                start = parse_hhmm(window.start)
+                end = parse_hhmm(window.end)
+            except ValueError as exc:
+                errors.append(str(exc))
+                continue
+            if end <= start:
+                errors.append(
+                    f"overlap: {window.name} must not cross or invert midnight "
+                    f"({window.start}->{window.end}); split the window"
+                )
+                continue
+            try:
+                days = [canonical_day(day) for day in window.days]
+            except ValueError as exc:
+                errors.append(str(exc))
+                continue
+            for day in days:
+                for minute in range(start, end):
+                    if covered[day][minute]:
+                        errors.append(f"overlap: {label} {day} minute {minute} covered twice ({window.name})")
+                        break
+                    covered[day][minute] = True
+        for day, slots in covered.items():
+            if not all(slots):
+                missing = slots.index(False)
+                errors.append(f"gap: {label} {day} missing minute {missing}")
+        for tier, prices in tier_prices.items():
+            if not prices:
+                errors.append(f"order: {label} missing tier {tier}")
+        if tier_prices["off_peak"] and tier_prices["normal"] and tier_prices["peak"]:
+            off_max = max(tier_prices["off_peak"])
+            normal_min = min(tier_prices["normal"])
+            normal_max = max(tier_prices["normal"])
+            peak_min = min(tier_prices["peak"])
+            if not (off_max < normal_min <= normal_max < peak_min):
+                errors.append(
+                    f"order: {label} require off-peak < normal < peak "
+                    f"(off<={off_max}, normal=[{normal_min}, {normal_max}], peak>={peak_min})"
+                )
 
     if errors:
-        # One message per distinct line; overlap checks can repeat a window.
         unique = list(dict.fromkeys(errors))
         raise ValueError("; ".join(unique))
 
@@ -195,6 +235,8 @@ def tariff_profile(cfg: TariffConfig, day: date) -> list[float]:
         for window in cfg.windows:
             days = {canonical_day(item) for item in window.days}
             if day_name not in days:
+                continue
+            if window.months is not None and day.month not in window.months:
                 continue
             start = parse_hhmm(window.start)
             end = parse_hhmm(window.end)
