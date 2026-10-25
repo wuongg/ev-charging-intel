@@ -1,6 +1,31 @@
-# Design parameters. Not fitted on day 1.
+# Day-2 forecast contract. Hyperparameters are defaults, not Optuna-tuned.
 quantiles: [0.1, 0.5, 0.9]
+lags: [1, 24, 48, 168, 336]
+rolling_windows: [24, 168]
 seasonal_period_hours: 168
 residual_window_days: 28
-# Set to the max session duration when the backtest is built.
-embargo_hours: null
+# Observed max dwell on the mirror is 245.3h. 14 days (336h) sits past that
+# session so a training hour's energy is finished before the origin.
+embargo_hours: 336
+origin_step_days: 14
+horizon_hours: 336
+# Training slice must be long enough for lag 336 plus one week of complete rows.
+min_train_hours: 504
+# Pre-registered primary window. The Kaggle mirror ends 2018-11-13, so this
+# window has no origins until a longer extract is mirrored. COVID (from
+# 2020-03-01) is not part of the primary window; it is a separate regime test.
+primary_origin_start: "2019-06-01"
+primary_origin_end: "2020-03-01"
+regime_origin_start: "2020-03-01"
+regime_origin_end: "2021-12-31"
+bootstrap_block_hours: 168
+bootstrap_replicates: 2000
+bootstrap_seed: 7
+lightgbm:
+  learning_rate: 0.05
+  num_leaves: 31
+  min_child_samples: 20
+  n_estimators: 200
+  subsample: 0.8
+  colsample_bytree: 0.8
+  seed: 7
