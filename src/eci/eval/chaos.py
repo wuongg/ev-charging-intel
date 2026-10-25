@@ -73,11 +73,26 @@ def ignore_pilot(committed, epoch, active_index, delivered, sessions, cap_kw, dt
     return extra_cost
 
 
+_HEADLINE_M: float | None = None
+
+
+def _headline_m() -> float:
+    global _HEADLINE_M
+    if _HEADLINE_M is None:
+        import yaml
+
+        from eci.config import REPO_ROOT
+
+        raw = yaml.safe_load((REPO_ROOT / "configs" / "scheduler.yaml").read_text(encoding="utf-8"))
+        _HEADLINE_M = float(raw["penalty_unmet_headline"])
+    return _HEADLINE_M
+
+
 def _loop(cap_kw: float) -> MPCLoop:
     return MPCLoop(
         slot_minutes=15,
         committed_k=1,
-        penalty_unmet=1000.0,
+        penalty_unmet=_headline_m(),
         cap_kw=cap_kw,
         tariff_windows=_windows(),
         timezone_name="America/Los_Angeles",
@@ -86,11 +101,11 @@ def _loop(cap_kw: float) -> MPCLoop:
 
 
 def _policy(state, slots, prices, cap, dt):
-    return solve_epoch_fast(state, slots, prices, cap, dt, 1000.0)
+    return solve_epoch_fast(state, slots, prices, cap, dt, _headline_m())
 
 
 def _bill(log) -> float:
-    return log.schedule.costs(1000.0)[0]
+    return log.schedule.costs(_headline_m())[0]
 
 
 def run_ch01(sessions: list[ScenarioSession] | None = None) -> dict:
@@ -120,7 +135,7 @@ def run_ch06(sessions: list[ScenarioSession] | None = None) -> dict:
         return {"case": "CH-06", "passed": False, "cost_delta": float("nan"), "i2_breaches": 0, "note": f"crash {exc}"}
     unmet = float(log.schedule.unmet_kwh.sum())
     if unmet > 1e-6:
-        alerts.append(f"unmet_kwh={unmet:.4f} priced at M=1000")
+        alerts.append(f"unmet_kwh={unmet:.4f} priced at M={_headline_m():.0f}")
     violations = check_invariants(log.schedule, sessions)
     passed = (not violations) and unmet > 1e-6 and bool(alerts)
     return {

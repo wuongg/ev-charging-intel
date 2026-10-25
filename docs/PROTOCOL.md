@@ -31,3 +31,23 @@ Decision, recorded before the Day-4 bank run: keep a zero-kWh session when measu
 The pre-registered primary comparison is P3 against P1 on `sce_ev4`, both at tier T2 (declared inputs plus the imputed deadline). P4 is the T3 oracle and is not in the primary test. The family of secondary comparisons is every other policy pair reported in `results/inference.csv`. Benjamini–Hochberg uses `bh_fdr_q: 0.10`, and the primary test is inside that family so its reported p-value is adjusted.
 
 EVN energy prices are in VND and sit above the frozen numeric penalty if that penalty is read as VND per kWh. The scheduler still delivers every kWh the plugs and the cap allow. Unmet energy, when the cap or the plug limit leaves some, is scored at the frozen `M = 1000` in the tariff's own currency. SCE and EVN totals are not converted into one currency. Both tariffs are applied on the `America/Los_Angeles` clock of the Caltech sessions. The demand charge is added when the bill is scored; it is not a term in the LP.
+
+## Headline penalty (Day 5 amendment, 2026-10-25T12:15:00Z)
+
+`penalty_unmet: 1000` stays as the stress value. Day 4 showed that number is about 10,000 times the SCE on-peak energy price, so the penalty was 99.7% of the bill and the cost comparison was the unmet term.
+
+`penalty_unmet_headline: 25` USD/kWh is the candidate used for a cost claim. It is about 100 times the SCE summer on-peak price 0.26668 USD/kWh. Twenty-five times that on-peak price is about 6.7 USD/kWh, which is already high for an internal depot; the headline keeps the larger of the two readings so one unmet kWh still dominates the energy price. `results/m_sensitivity.csv` reports M in {10, 25, 100, 1000}. The headline is the largest of those four at which the P3 bill and the P4 bill both have a penalty share under 50%. It is not moved to make P3 beat P1.
+
+A cost claim in the README states this M and the penalty share. A comparison whose penalty share is above 50% is not stated as a cost claim.
+
+## Deadline imputation v2 (Day 5 amendment, 2026-10-25T12:15:00Z)
+
+The Day-4 deadline was connection plus the 2019 median dwell, 5.27 hours. Dwell is right-skewed. On Caltech 2018 sessions with kWh > 0 the median is 4.17 hours, the 95th percentile is 12.36 hours, and the maximum is 245 hours.
+
+T2v2 draws one dwell from the empirical distribution of the same station and Los Angeles hour in that 2018 set. The draw is the quantile of a unit interval hashed from the session id, so the same id always gets the same deadline. A station-hour with fewer than 30 dwells falls back to that hour, then to the whole 2018 distribution. Energy stays `kWhDelivered`. A declared `requestedDeparture` is kept.
+
+## Declared-input bank (Day 5 amendment, 2026-10-25T12:19:18Z)
+
+The 2019 snapshot has no `userInputs`, so a reproduction on `bank_K50` compares two synthetic deadlines. Reproduction v2 uses only Caltech sessions that declared a `requestedDeparture`.
+
+1,195 sessions pass the filters: site 0002, `kWhDelivered > 0`, and a departure delta in (0, 36 hours]. Their local connections run from 2018-04-30 through 2018-11-13. The child bank is a day-block bootstrap of that subset, skeleton year 2018, 50 years, seed 7. `bank_declared_hash` is `1b0a517fadbbc21d25c370454d25f53ec71ae39f05e2eec2de732b540996a70b` (135,566 rows). It was written here before `scripts/reproduce_v2.py` ran. P3 reads the declared departure shifted onto the resampled connection. Energy stays `kWhDelivered`.

@@ -1,8 +1,14 @@
 slot_minutes: 15
-# Frozen on day 3. Not tuned against the E2E cost.
-# 1000 USD/kWh is large next to the 0.10–0.40 placeholder tariff, so the LP
-# meets energy whenever the window and the cap allow it.
+# penalty_unmet is the Day-3 stress value. It stays in the file.
+# Day-5 amendment 2026-10-25T12:15:00Z: cost claims use penalty_unmet_headline.
+# 25 USD/kWh is about 100× the SCE summer on-peak price 0.26668 USD/kWh.
+# 25× that on-peak price is about 6.7 USD/kWh, a lost trip plus a substitute
+# charge, and that reading is high for an internal depot. The headline keeps
+# the larger figure so one unmet kWh still dominates the energy price, and
+# results/m_sensitivity.csv reports M in {10, 25, 100, 1000} rather than one pick.
+# The headline is not chosen to make P3 beat P1.
 penalty_unmet: 1000.0
+penalty_unmet_headline: 25.0
 epsilon_peak: null
 committed_k: 1
 nominal_volts: 208

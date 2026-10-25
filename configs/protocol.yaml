@@ -22,4 +22,36 @@ regime:
 frozen:
   embargo_hours: 336
   penalty_unmet: 1000.0
+  penalty_unmet_headline: 25.0
   committed_k: 1
+headline_rule:
+  amended_at: '2026-10-25T12:15:00Z'
+  text: A cost claim in the README states the headline M and the penalty share
+    of the bill. A comparison whose penalty share is above 50% is not stated
+    as a cost claim. The headline is the largest M in {10, 25, 100, 1000} at
+    which both P3 and P4 stay under that share. 25 is the pre-registered
+    candidate. It is not moved to make P3 beat P1.
+imputation_v2:
+  amended_at: '2026-10-25T12:15:00Z'
+  rule: connection plus one draw from the empirical dwell CDF of the same
+    station and Los Angeles hour, built from Caltech 2018 sessions with
+    kWh > 0. The draw is the empirical quantile of a unit interval hashed
+    from the session id. A stratum with fewer than 30 dwells falls back to
+    the hour, then to the 2018 CDF. Energy stays kWhDelivered. A declared
+    requestedDeparture is kept and is not replaced by the draw.
+bank_declared_hash: 1b0a517fadbbc21d25c370454d25f53ec71ae39f05e2eec2de732b540996a70b
+bank_declared:
+  amended_at: '2026-10-25T12:19:18Z'
+  file: scenarios/bank_declared_K50.parquet
+  n_source_sessions: 1195
+  regime_start: '2018-04-30'
+  regime_end: '2018-11-14'
+  skeleton_year: 2018
+  n_years: 50
+  seed: 7
+  rows: 135566
+  text: Child bank of Caltech sessions that declared a requestedDeparture
+    with a delta in (0, 36h] and kWhDelivered > 0. Same day-block bootstrap
+    as the frozen 2019 bank. Drawn and hashed before the reproduction v2 run.
+    P3 uses that declared departure shifted onto the new connection. Energy
+    stays kWhDelivered, so the gap is a departure-information gap.
