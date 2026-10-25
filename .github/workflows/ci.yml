@@ -44,6 +44,8 @@ jobs:
           python -m pip install --no-deps --no-build-isolation -e .
       - name: Pytest
         run: pytest -q
+      - name: Chaos mini week
+        run: python scripts/run_chaos.py
 
   mini-pipeline:
     runs-on: ubuntu-latest

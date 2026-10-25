@@ -1,2 +1,11 @@
-# CH-01..CH-10 land with the chaos suite (week 2).
-cases: []
+# CI runs CH-01, CH-06, and CH-08 on one synthetic week. The rest of the catalogue is later.
+cases:
+  - id: CH-01
+    fault: drop_sessions
+    frac: 0.10
+  - id: CH-06
+    fault: force_infeasible
+    cap_cut: 0.5
+  - id: CH-08
+    fault: ignore_pilot
+    frac_one_epoch: 0.20
