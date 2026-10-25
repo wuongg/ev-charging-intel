@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 import polars as pl
+import pytest
 
 from eci.forecast.backtest import iter_folds, seasonal_naive_censored
 from eci.forecast.lightgbm_q import (
@@ -95,6 +96,8 @@ def test_shuffled_time_control() -> None:
     assert "_y_obs" not in names
 
     frame = build_feature_frame(_hourly_frame(shuffled), lags=LAGS, windows=WINDOWS)
+    assert frame["lag_1"][test_from] == pytest.approx(float(shuffled[test_from - 1]))
+    assert "kWh_delivered" not in names
     matrix = frame.select(names).to_numpy()
     target = shuffled
     train_idx = np.arange(336, test_from)

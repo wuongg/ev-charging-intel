@@ -9,6 +9,7 @@ from __future__ import annotations
 import csv
 import sys
 from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 import polars as pl
@@ -19,8 +20,7 @@ from eci.data.measures import print_hazard_rows, write_hazard_metrics
 from eci.forecast.backtest import (
     iter_folds,
     localize_origin,
-    rolling_origin_cv,
-    seasonal_naive_censored,
+    seasonal_naive_causal,
     series_end_exclusive,
 )
 from eci.forecast.chronos import chronos_zero_shot
@@ -59,7 +59,7 @@ def _naive_fn(cfg):
 
     def predict(series: pl.DataFrame, fold) -> dict[float, np.ndarray]:
         y = series[VALUE_COL].to_numpy()
-        return seasonal_naive_censored(
+        return seasonal_naive_causal(
             y,
             fold.test_idx,
             fold.cutoff_idx,
@@ -79,22 +79,42 @@ def _lightgbm_fn(cfg, params: dict | None = None):
     fitted = dict(params or _params(cfg))
 
     def predict(series: pl.DataFrame, fold) -> dict[float, np.ndarray]:
+        # No cutoff mask. shift/rolling already use actuals strictly before each row.
         frame = build_feature_frame(
             series,
             lags=lags,
             windows=windows,
             value_col=VALUE_COL,
             time_col=TIME_COL,
-            cutoff=fold.cutoff,
+            cutoff=None,
         )
         matrix = frame.select(names).to_numpy()
-        target = np.asarray(frame["_y_obs"].to_numpy(), dtype=float)
+        target = np.asarray(series[VALUE_COL].to_numpy(), dtype=float)
         train_target = target[fold.train_idx]
         train_matrix = matrix[fold.train_idx]
         models = train_lightgbm_quantile(train_matrix, train_target, names, quantiles, fitted)
         return predict_quantiles(models, matrix[fold.test_idx])
 
     return predict
+
+
+def history_null_fraction(series: pl.DataFrame, fold, cfg) -> float:
+    """Share of lag and rolling cells on the test horizon that are missing."""
+    lags = [int(lag) for lag in cfg.lags]
+    windows = [int(window) for window in cfg.rolling_windows]
+    names = [name for name in feature_column_names(lags, windows) if name.startswith(("lag_", "roll_"))]
+    frame = build_feature_frame(
+        series,
+        lags=lags,
+        windows=windows,
+        value_col=VALUE_COL,
+        time_col=TIME_COL,
+        cutoff=None,
+    )
+    matrix = frame.gather(fold.test_idx.tolist()).select(names).to_numpy()
+    if matrix.size == 0:
+        return float("nan")
+    return float(np.mean(~np.isfinite(matrix)))
 
 
 def _ensemble_fn(cfg):
@@ -214,28 +234,61 @@ def _compare_row(
     }
 
 
-def _run_window(series: pl.DataFrame, cfg, origin_start: datetime, origin_end: datetime) -> dict[str, pl.DataFrame]:
-    common = dict(
+def _predict_frame(series: pl.DataFrame, fold, predicted: dict[float, np.ndarray]) -> pl.DataFrame:
+    test = series.gather(fold.test_idx.tolist())
+    columns: dict[str, object] = {
+        TIME_COL: test[TIME_COL],
+        "y": test[VALUE_COL],
+        "origin": [fold.origin] * int(fold.test_idx.size),
+    }
+    for level, values in predicted.items():
+        columns[f"q{int(round(float(level) * 100)):02d}"] = np.asarray(values, dtype=float)
+    return pl.DataFrame(columns)
+
+
+def _run_window(series: pl.DataFrame, cfg, origin_start: datetime, origin_end: datetime):
+    """One pass per origin. LightGBM is fit once and reused by the ensemble."""
+    folds = iter_folds(
+        list(series[TIME_COL].to_list()),
         embargo_hours=int(cfg.embargo_hours),
         origin_step_hours=int(cfg.origin_step_days) * 24,
         horizon_hours=int(cfg.horizon_hours),
         min_train_hours=int(cfg.min_train_hours),
         origin_start=origin_start,
         origin_end=origin_end,
-        time_col=TIME_COL,
-        value_col=VALUE_COL,
     )
-    models = {
-        "seasonal_naive": _naive_fn(cfg),
-        "lightgbm": _lightgbm_fn(cfg),
-        "ensemble": _ensemble_fn(cfg),
-    }
-    out: dict[str, pl.DataFrame] = {}
-    for name, fn in models.items():
-        folds, frame = rolling_origin_cv(series, fn, **common)
-        print(f"{name}: origins={len(folds)} rows={frame.height}")
-        out[name] = frame
-    return out
+    naive_fn = _naive_fn(cfg)
+    lightgbm_fn = _lightgbm_fn(cfg)
+    buckets: dict[str, list[pl.DataFrame]] = {name: [] for name in ("seasonal_naive", "lightgbm", "ensemble")}
+    for index, fold in enumerate(folds, start=1):
+        naive = naive_fn(series, fold)
+        lightgbm = lightgbm_fn(series, fold)
+        ensemble = rearrange(equal_weight_quantiles([naive, lightgbm]))
+        buckets["seasonal_naive"].append(_predict_frame(series, fold, naive))
+        buckets["lightgbm"].append(_predict_frame(series, fold, lightgbm))
+        buckets["ensemble"].append(_predict_frame(series, fold, ensemble))
+        if index == 1 or index == len(folds) or index % 5 == 0:
+            print(f"origin {index}/{len(folds)} {fold.origin.isoformat()}")
+    out = {name: pl.concat(frames, how="vertical") if frames else pl.DataFrame() for name, frames in buckets.items()}
+    print(f"v2 origins={len(folds)} rows={out['seasonal_naive'].height if folds else 0}")
+    return out, folds
+
+
+def _preserved_v1_rows(path: Path) -> list[dict]:
+    """Keep the day-2 mirror scores. Their note is marked information-asymmetric."""
+    if not path.exists():
+        return []
+    with path.open(encoding="utf-8", newline="") as handle:
+        loaded = list(csv.DictReader(handle))
+    kept = []
+    for row in loaded:
+        if row.get("eval_window") != "mirror_2018":
+            continue
+        note = row.get("note") or ""
+        if "v1, information-asymmetric" not in note:
+            row["note"] = f"v1, information-asymmetric; {note}".strip()
+        kept.append(row)
+    return kept
 
 
 def _empty_window_row(window: str, note: str) -> dict:
@@ -275,24 +328,26 @@ def main() -> int:
         print("hourly series is empty", file=sys.stderr)
         return 1
     quantiles = [float(tau) for tau in cfg.quantiles]
-    mirror_note = (
-        f"mirror span {times[0].isoformat()} to {times[-1].isoformat()}; "
-        "embargo 336h hides every configured lag on the horizon"
+    v2_note = (
+        f"v2, features-from-actuals; span {times[0].isoformat()} to {times[-1].isoformat()}; "
+        "embargo 336h restricts training rows only"
     )
-    print(f"hourly hours={hourly.height} {mirror_note}")
-    predictions = _run_window(series=hourly, cfg=cfg, origin_start=times[0], origin_end=series_end_exclusive(times))
+    print(f"hourly hours={hourly.height} {v2_note}")
+    predictions, v2_folds = _run_window(
+        series=hourly, cfg=cfg, origin_start=times[0], origin_end=series_end_exclusive(times)
+    )
     if predictions["seasonal_naive"].height == 0:
-        print("no mirror origins", file=sys.stderr)
+        print("no extended origins", file=sys.stderr)
         return 1
 
     rows: list[dict] = []
-    window = "mirror_2018"
+    window = "extended_2018_2020"
     losses: dict[str, np.ndarray] = {}
     for name, frame in predictions.items():
-        rows.extend(_score_rows(frame, name, window, quantiles, mirror_note))
+        rows.extend(_score_rows(frame, name, window, quantiles, v2_note))
         losses[name] = _mean_loss(frame, quantiles)
         rows.append(
-            _compare_row(name, window, "n_origins", frame["origin"].n_unique(), frame.height, mirror_note)
+            _compare_row(name, window, "n_origins", frame["origin"].n_unique(), frame.height, v2_note)
         )
 
     block = int(cfg.bootstrap_block_hours)
@@ -313,7 +368,7 @@ def main() -> int:
                 "mean_pinball",
                 mean_pinball,
                 int(np.isfinite(loss).sum()),
-                mirror_note,
+                v2_note,
             )
         )
         if name == "seasonal_naive" or naive_mean == 0:
@@ -323,7 +378,7 @@ def main() -> int:
         if name != "seasonal_naive":
             test = paired_moving_block_bootstrap(loss, naive_loss, block=block, B=draws, seed=seed)
             rows.append(
-                _compare_row(name, window, "pvalue_vs_naive", float(test["p_value"]), int(test["n"]), mirror_note)
+                _compare_row(name, window, "pvalue_vs_naive", float(test["p_value"]), int(test["n"]), v2_note)
             )
             rows.append(
                 _compare_row(
@@ -383,18 +438,6 @@ def main() -> int:
     )
 
     end_local = times[-1].isoformat()
-    rows.append(
-        _empty_window_row(
-            "primary_2019_06_2020_03",
-            f"pre-registered primary window has no origins; mirror ends {end_local}",
-        )
-    )
-    rows.append(
-        _empty_window_row(
-            "regime_2020_03",
-            f"COVID regime window has no origins; mirror ends {end_local}",
-        )
-    )
     primary_start = localize_origin(cfg.primary_origin_start, times[0])
     primary_end = localize_origin(cfg.primary_origin_end, times[0])
     regime_start = localize_origin(cfg.regime_origin_start, times[0])
@@ -403,7 +446,7 @@ def main() -> int:
         ("primary_2019_06_2020_03", primary_start, primary_end),
         ("regime_2020_03", regime_start, regime_end),
     ):
-        folds = iter_folds(
+        window_folds = iter_folds(
             times,
             embargo_hours=int(cfg.embargo_hours),
             origin_step_hours=int(cfg.origin_step_days) * 24,
@@ -412,13 +455,50 @@ def main() -> int:
             origin_start=start,
             origin_end=end,
         )
-        print(f"{label}: origins={len(folds)}")
-        if folds:
-            print(f"WARNING {label} was expected to be empty on this mirror and is not")
+        print(f"{label}: origins={len(window_folds)}")
+        if not window_folds:
+            rows.append(
+                _empty_window_row(
+                    label,
+                    f"no origin landed in this window; series ends {end_local}",
+                )
+            )
+        else:
+            rows.append(
+                _compare_row(
+                    "",
+                    label,
+                    "n_origins",
+                    len(window_folds),
+                    len(window_folds) * int(cfg.horizon_hours),
+                    "subset of the extended_2018_2020 origins; same fits, not a second training run",
+                )
+            )
 
+    diagnosis = []
+    lightgbm_frame = predictions["lightgbm"]
+    for fold in v2_folds:
+        sub = lightgbm_frame.filter(pl.col("origin") == fold.origin)
+        coverage = empirical_coverage(sub["y"].to_numpy(), sub["q10"].to_numpy(), sub["q90"].to_numpy())
+        diagnosis.append(
+            {
+                "eval_window": window,
+                "origin": fold.origin.isoformat(),
+                "coverage": coverage,
+                "null_feature_fraction": history_null_fraction(hourly, fold, cfg),
+                "n": sub.height,
+                "note": v2_note,
+            }
+        )
+    outside = [row for row in diagnosis if not (0.70 <= row["coverage"] <= 0.90)]
+    if outside:
+        print(f"WARNING {len(outside)}/{len(diagnosis)} origins have LightGBM coverage outside [0.70, 0.90]")
+
+    preserved = _preserved_v1_rows(REPO_ROOT / "results" / "forecast_scores.csv")
     prov = forecast_prov
     for row in rows:
         row.update(prov)
+    rows = preserved + rows
     dest = REPO_ROOT / "results" / "forecast_scores.csv"
     dest.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
@@ -436,9 +516,20 @@ def main() -> int:
         writer.writeheader()
         writer.writerows(rows)
     print(f"wrote {dest}")
+    diagnosis_path = REPO_ROOT / "results" / "forecast_diagnosis.csv"
+    with diagnosis_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["eval_window", "origin", "coverage", "null_feature_fraction", "n", "note", *prov.keys()],
+        )
+        writer.writeheader()
+        for row in diagnosis:
+            row.update(prov)
+            writer.writerow(row)
+    print(f"wrote {diagnosis_path}")
 
-    scores = pl.read_csv(dest)
-    choice = pick_forecast(scores, "mirror_2018")
+    scores = pl.read_csv(dest, infer_schema_length=None)
+    choice = pick_forecast(scores, "extended_2018_2020")
     print(
         f"champion={choice['champion']} mean_pinball={choice['mean_pinball']} "
         f"beats_naive={choice['beats_naive']} p_value_vs_naive={choice['p_value_vs_naive']}"

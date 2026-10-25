@@ -1,16 +1,14 @@
 """Expanding-window rolling-origin evaluation.
 
-The embargo is 14 days. The longest session on the mirror dwells 245.3 hours,
-so 336 hours sits past a session that started on the last training hour and
-guarantees its energy is no longer in flight at the origin.
+The embargo is 14 days and applies to the training prefix only. A fold's
+``train_idx`` stops at ``origin − embargo``.
 
-That embargo is also the longest lag (336h). On a test hour, every lag and
-every rolling window is built only from actuals strictly before
-``origin − embargo``. Seasonal naive uses the same cutoff: it walks back by
-whole seasons until the source hour is inside the training prefix. Both
-members therefore forecast the horizon from a calendar plus history that ended
-two weeks earlier. The comparison is handicapped on purpose. Using y[t − 168]
-when that hour sits inside the embargo would leak.
+Feature availability is separate. Version 2 builds lags and rolling windows
+from actuals strictly before the hour being forecast, including hours inside
+the embargo and earlier hours of the horizon. Version 1 nulled every actual at
+or after the cutoff, so every lag on the horizon was missing while seasonal
+naive could still see a pre-cutoff actual. That was an information-asymmetric
+comparison. The embargo length itself is unchanged.
 """
 
 from __future__ import annotations
@@ -105,6 +103,35 @@ def seasonal_naive_censored(
         source = t - m
         while source >= cutoff_idx:
             source -= m
+        if source >= 0 and np.isfinite(values[t]) and np.isfinite(values[source]):
+            residuals.append(float(values[t] - values[source]))
+    offsets = {float(tau): (_quantile(residuals, float(tau)) if residuals else 0.0) for tau in quantiles}
+    return {tau: point + offset for tau, offset in offsets.items()}
+
+
+def seasonal_naive_causal(
+    y: np.ndarray,
+    test_idx: np.ndarray,
+    cutoff_idx: int,
+    *,
+    m: int = 168,
+    residual_window_hours: int = 28 * 24,
+    quantiles: tuple[float, ...] = (0.1, 0.5, 0.9),
+) -> dict[float, np.ndarray]:
+    """y[t − m] for every test hour. The source only has to be before t.
+
+    Residual quantiles still come from the training prefix, before the cutoff.
+    The embargo does not hide a lag that has already been observed.
+    """
+    values = np.asarray(y, dtype=float)
+    point = np.empty(len(test_idx), dtype=float)
+    for index, t in enumerate(test_idx):
+        source = int(t) - m
+        point[index] = values[source] if source >= 0 else np.nan
+    residuals: list[float] = []
+    start = max(0, cutoff_idx - residual_window_hours)
+    for t in range(start, cutoff_idx):
+        source = t - m
         if source >= 0 and np.isfinite(values[t]) and np.isfinite(values[source]):
             residuals.append(float(values[t] - values[source]))
     offsets = {float(tau): (_quantile(residuals, float(tau)) if residuals else 0.0) for tau in quantiles}
