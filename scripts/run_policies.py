@@ -165,6 +165,14 @@ def _summary(frame: pl.DataFrame) -> pl.DataFrame:
 
 
 def main() -> int:
+    if "--m-sensitivity" in sys.argv:
+        from run_m_sensitivity import main as run_m
+
+        return run_m()
+    if "--cap-sweep" in sys.argv:
+        from run_cap_sweep import main as run_cap
+
+        return run_cap()
     bank_path = REPO_ROOT / "scenarios" / "bank_K50.parquet"
     if not bank_path.exists():
         print(f"missing {bank_path}", file=sys.stderr)

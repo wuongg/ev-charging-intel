@@ -52,16 +52,7 @@ def queue_edf(sessions: list[ScenarioSession], n_plugs: int = 54) -> list[Scenar
         while waiting and len(active) < n_plugs:
             nxt = waiting.pop(0)
             start = max(nxt.connection, session.connection)
-            dwell = nxt.disconnect - nxt.connection
-            moved = ScenarioSession(
-                session_id=nxt.session_id,
-                connection=start,
-                disconnect=start + dwell,
-                kwh=nxt.kwh,
-                p_max_kw=nxt.p_max_kw,
-                requested_departure=nxt.requested_departure,
-                kwh_requested=nxt.kwh_requested,
-            )
+            moved = _shift(nxt, start)
             active.append(moved)
             accepted.append(moved)
     while waiting:
@@ -72,16 +63,21 @@ def queue_edf(sessions: list[ScenarioSession], n_plugs: int = 54) -> list[Scenar
         freed = active.pop(0)
         nxt = waiting.pop(0)
         start = max(nxt.connection, freed.disconnect)
-        dwell = nxt.disconnect - nxt.connection
-        moved = ScenarioSession(
-            session_id=nxt.session_id,
-            connection=start,
-            disconnect=start + dwell,
-            kwh=nxt.kwh,
-            p_max_kw=nxt.p_max_kw,
-            requested_departure=nxt.requested_departure,
-            kwh_requested=nxt.kwh_requested,
-        )
+        moved = _shift(nxt, start)
         active.append(moved)
         accepted.append(moved)
     return accepted
+
+
+def _shift(session: ScenarioSession, start) -> ScenarioSession:
+    dwell = session.disconnect - session.connection
+    return ScenarioSession(
+        session_id=session.session_id,
+        connection=start,
+        disconnect=start + dwell,
+        kwh=session.kwh,
+        p_max_kw=session.p_max_kw,
+        requested_departure=session.requested_departure,
+        kwh_requested=session.kwh_requested,
+        station_id=session.station_id,
+    )
