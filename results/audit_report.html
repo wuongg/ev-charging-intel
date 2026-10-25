@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>ECI audit gate — PASS</title>
+<style>
+body { font-family: Georgia, serif; margin: 2rem; color: #1c1917; }
+table { border-collapse: collapse; margin: 1rem 0; }
+td, th { border: 1px solid #d6d3d1; padding: 0.3rem 0.6rem; }
+.fail { color: #9f1239; }
+.pass { color: #166534; }
+</style>
+</head>
+<body>
+<h1>Audit gate <span class="pass">PASS</span></h1>
+<p>Quality score Q = Π(1 − exclusion rate) over R1, R3, and V3. Flags stay in the data and do not reduce Q.</p>
+<p><strong>Q = 1.000000</strong></p>
+<ul>
+<li>f_clock_skew: 716 (5.23%)</li>
+<li>f_long_dwell &gt; 48h: 48 (0.35%)</li>
+<li>dwell &gt; 24h: 143 (1.04%)</li>
+<li>userID missing: 12553 (91.63%)</li>
+<li>multi-input among sessions with userInputs: 345 / 1146 (30.10%)</li>
+<li>kWh == 0: 0 (0.00%)</li>
+<li>arrival peak local hour: 8</li>
+</ul>
+<h2>Gate</h2>
+<ul><li>none</li></ul>
+<h2>Provenance</h2>
+<ul><li><code>git_sha</code>: <code>unknown</code></li><li><code>config_hash</code>: <code>bec119858bb4a878b2493b926dcee23f7234f698848de5c30d1f919d94ae1397</code></li><li><code>data_hash</code>: <code>019351fabd57b306ec4c9f5a33e95a8e47b98b1cf4a62c70976e701416812291</code></li><li><code>utc_now</code>: <code>2026-10-25T09:15:44Z</code></li></ul>
+<h2>Funnel</h2>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>stage</th>
+      <th>rule</th>
+      <th>action</th>
+      <th>n_in</th>
+      <th>n_excluded</th>
+      <th>n_flagged</th>
+      <th>n_out</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>R1</td>
+      <td>parse_fail</td>
+      <td>EXCLUDE</td>
+      <td>13699</td>
+      <td>0</td>
+      <td>0</td>
+      <td>13699</td>
+    </tr>
+    <tr>
+      <td>R2</td>
+      <td>schema_coerce</td>
+      <td>FLAG</td>
+      <td>13699</td>
+      <td>0</td>
+      <td>2081</td>
+      <td>13699</td>
+    </tr>
+    <tr>
+      <td>R3</td>
+      <td>dedupe_station_connection_space</td>
+      <td>EXCLUDE</td>
+      <td>13699</td>
+      <td>0</td>
+      <td>0</td>
+      <td>13699</td>
+    </tr>
+    <tr>
+      <td>V1</td>
+      <td>dst_cross</td>
+      <td>FLAG</td>
+      <td>13699</td>
+      <td>0</td>
+      <td>2</td>
+      <td>13699</td>
+    </tr>
+    <tr>
+      <td>V2</td>
+      <td>clock_skew</td>
+      <td>FLAG</td>
+      <td>13699</td>
+      <td>0</td>
+      <td>716</td>
+      <td>13699</td>
+    </tr>
+    <tr>
+      <td>V3</td>
+      <td>time_order</td>
+      <td>EXCLUDE</td>
+      <td>13699</td>
+      <td>0</td>
+      <td>0</td>
+      <td>13699</td>
+    </tr>
+    <tr>
+      <td>V4</td>
+      <td>kwh_range</td>
+      <td>FLAG</td>
+      <td>13699</td>
+      <td>0</td>
+      <td>0</td>
+      <td>13699</td>
+    </tr>
+    <tr>
+      <td>V5</td>
+      <td>long_dwell</td>
+      <td>FLAG</td>
+      <td>13699</td>
+      <td>0</td>
+      <td>48</td>
+      <td>13699</td>
+    </tr>
+    <tr>
+      <td>V6</td>
+      <td>userinputs_absurd</td>
+      <td>FLAG</td>
+      <td>13699</td>
+      <td>0</td>
+      <td>68</td>
+      <td>13699</td>
+    </tr>
+  </tbody>
+</table>
+<h2>Arrival hour (local)</h2>
+<table><thead><tr><th>hour</th><th>sessions</th></tr></thead><tbody>
+<tr><td>00</td><td>86</td></tr><tr><td>01</td><td>57</td></tr><tr><td>02</td><td>24</td></tr><tr><td>03</td><td>22</td></tr><tr><td>04</td><td>136</td></tr><tr><td>05</td><td>79</td></tr><tr><td>06</td><td>407</td></tr><tr><td>07</td><td>1060</td></tr><tr><td>08</td><td>2535</td></tr><tr><td>09</td><td>1720</td></tr><tr><td>10</td><td>806</td></tr><tr><td>11</td><td>472</td></tr><tr><td>12</td><td>640</td></tr><tr><td>13</td><td>621</td></tr><tr><td>14</td><td>450</td></tr><tr><td>15</td><td>493</td></tr><tr><td>16</td><td>608</td></tr><tr><td>17</td><td>721</td></tr><tr><td>18</td><td>836</td></tr><tr><td>19</td><td>676</td></tr><tr><td>20</td><td>529</td></tr><tr><td>21</td><td>349</td></tr><tr><td>22</td><td>248</td></tr><tr><td>23</td><td>124</td></tr>
+</tbody></table>
+</body>
+</html>
