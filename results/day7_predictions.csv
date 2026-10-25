@@ -1,4 +1,4 @@
 metric,predicted,band_low,band_high,actual,match,note,predicted_at
-voi_sce_m25_t2c_fraction,0.20,0.0,0.50,,,VOI of an oracle deadline versus T2C on the frozen bank, SCE, M=25, as a fraction of the P0 bill. The Day-6 raw-T2 number was 2.84. Band is the pre-registered under-50-percent target.,2026-10-26T00:00:00Z
-reproduction_v4_gap,0.092,0.01,0.15,,,(cost P3 T2C minus cost P4) / cost P4 on the declared-departure bank. Band is 1 to 15 percent around the published 9.2 percent.,2026-10-26T00:00:00Z
-t2c_dial_unmet_slope,0.05,-1.0,1.0,,,unmet percent at beta 0.75 minus unmet percent at beta 0.25. A positive value means the dial is still inverted (longer belief, more unmet). Predicted still inverted because cheapest-slot waits when the window is long.,2026-10-26T00:00:00Z
+voi_sce_m25_t2c_fraction,0.2,0.0,0.5,4.885683321343422,false,"VOI of an oracle deadline versus T2C on the frozen bank, SCE, M=25, as a fraction of the P0 bill. The Day-6 raw-T2 number was 2.84. Band is the pre-registered under-50-percent target.",2026-10-26T00:00:00Z
+reproduction_v4_gap,0.092,0.01,0.15,2.4933185612638114,false,(cost P3 T2C minus cost P4) / cost P4 on the declared-departure bank. Band is 1 to 15 percent around the published 9.2 percent.,2026-10-26T00:00:00Z
+t2c_dial_unmet_slope,0.05,-1.0,1.0,12.34897083183084,false,unmet percent at beta 0.75 minus unmet percent at beta 0.25. A positive value means the dial is still inverted.,2026-10-26T00:00:00Z

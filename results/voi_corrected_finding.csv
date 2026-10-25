@@ -1,0 +1,2 @@
+metric,value,target,under_target,note
+voi_sce_m25_t2c_fraction,4.885683321343422,0.5,false,"T2C at β=0.5 did not shrink VOI: hour-only actual p50 is later than T2v2, so cheapest-slot waits more. β was not moved"
