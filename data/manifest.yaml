@@ -1,0 +1,13 @@
+files:
+- file: data/raw/acndata_sessions.json
+  sha256: 035ad2bd697825935aef756babfbc661f261c52d601af02e799f90d50db91ff3
+  source_url: https://www.kaggle.com/api/v1/datasets/download/dextersebs/ev-dataset
+  downloaded_at: '2026-10-25T09:15:32Z'
+  rows_recovered: 13699
+  truncated: true
+- file: data/raw/weather/kbur_asos_2018_2021.csv
+  sha256: fcf806e290abbd881d732a35fe386b1696ef4540831955b87b5c01f7211aa278
+  source_url: https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py
+  downloaded_at: '2026-10-25T09:15:42Z'
+  rows_recovered: 38969
+  truncated: false
