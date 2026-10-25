@@ -42,14 +42,16 @@ def _floor_slot(moment: datetime, minutes: int) -> datetime:
 
 def _requirements(session: ScenarioSession, tier: str, median_dwell: timedelta) -> tuple[datetime, float]:
     if tier == "T3":
-        return session.disconnect, session.kwh
-    if tier == "T2":
+        end = session.disconnect
+    elif tier == "T2":
         # T2v2 writes requested_departure before the replay. A missing one
         # falls back to the single median, which is the Day-4 imputation.
         end = session.requested_departure or (session.connection + median_dwell)
-        energy = session.kwh_requested if session.kwh_requested is not None else session.kwh
-        return end, float(energy)
-    raise ValueError(f"tier {tier} is not run on day 3")
+    else:
+        raise ValueError(f"tier {tier} is not run on day 3")
+    # kwh_requested is the energy the policy believes. Unmet is scored on session.kwh.
+    energy = session.kwh_requested if session.kwh_requested is not None else session.kwh
+    return end, float(energy)
 
 
 class MPCLoop:
@@ -157,21 +159,21 @@ class MPCLoop:
                     }
                 )
             epoch += k
+        # Unmet is energy the car needed and did not receive before the physical unplug.
         unmet = np.array(
-            [max(requirements[index][1] - delivered[index], 0.0) for index in range(n_i)],
+            [max(session.kwh - delivered[index], 0.0) for index, session in enumerate(sessions)],
             dtype=float,
         )
-        # Final check uses the original requirements, not the last epoch's remainder.
         # The committed trajectory is a plant record. Its feasible window is the
         # physical plug, which can outlast the deadline the policy believed.
         final_vehicles = []
         for index, session in enumerate(sessions):
-            _belief_end, energy = requirements[index]
+            plan_energy = requirements[index][1]
             final_vehicles.append(
                 Vehicle(
                     vehicle_id=session.session_id,
-                    energy_remaining_kwh=energy,
-                    battery_max_kwh=max(energy, 0.0),
+                    energy_remaining_kwh=session.kwh,
+                    battery_max_kwh=max(session.kwh, plan_energy, 0.0),
                     window_start=session.connection,
                     window_end=session.disconnect,
                     p_max_kw=session.p_max_kw,

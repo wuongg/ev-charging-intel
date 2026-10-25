@@ -59,6 +59,8 @@ def sessions_from_rows(
     nominal_volts: float,
     default_kw: float,
     declared: dict | None = None,
+    *,
+    use_requested_kwh: bool = False,
 ) -> list[ScenarioSession]:
     """kWh == 0 rows are not an energy need. The frozen bank already dropped them.
 
@@ -77,7 +79,7 @@ def sessions_from_rows(
             connection = connection.replace(tzinfo=ZoneInfo("UTC"))
         if disconnect.tzinfo is None:
             disconnect = disconnect.replace(tzinfo=ZoneInfo("UTC"))
-        departure, _requested_kwh = declared.get(_source_key(str(row["sessionID"])), (None, None))
+        departure, requested_kwh = declared.get(_source_key(str(row["sessionID"])), (None, None))
         if isinstance(departure, timedelta):
             departure = connection + departure
         if departure is not None and departure <= connection:
@@ -90,7 +92,7 @@ def sessions_from_rows(
                 kwh=kwh,
                 p_max_kw=p_max_kw(row.get("pilot_amp"), nominal_volts, default_kw),
                 requested_departure=departure,
-                kwh_requested=None,
+                kwh_requested=requested_kwh if use_requested_kwh else None,
                 station_id=str(row.get("stationID") or ""),
             )
         )
