@@ -43,7 +43,6 @@ def main() -> int:
     frame.write_csv(dest)
     tests = _tests(frame).with_columns([pl.lit(prov[key]).alias(key) for key in prov])
     tests.write_csv(REPO_ROOT / "results" / "cap_sweep_tests.csv")
-    print(tests)
     print(f"wrote {dest}")
     print(prov)
     return 0

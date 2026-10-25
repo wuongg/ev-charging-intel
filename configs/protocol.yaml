@@ -55,3 +55,17 @@ bank_declared:
     as the frozen 2019 bank. Drawn and hashed before the reproduction v2 run.
     P3 uses that declared departure shifted onto the new connection. Energy
     stays kWhDelivered, so the gap is a departure-information gap.
+headline_result:
+  amended_at: '2026-10-25T14:18:16Z'
+  text: No M in {10, 25, 100, 1000} puts both the P3 bill and the P4 bill
+    under a 50% penalty share on the T2v2 bank. P3 share is 0.897 at M=10
+    and 0.956 at M=25. P4 share is 0.109 at M=10 and 0.232 at M=25. The
+    candidate 25 is unchanged. It was not lowered below the grid, and it
+    was not moved to make P3 beat P1. P3 costs more than P0 at every M.
+    A figure at M=25 is not a cost claim.
+imputation_v2_result:
+  amended_at: '2026-10-25T14:18:16Z'
+  unmet_p3: 0.2309
+  text: P3 unmet on the frozen bank is 0.231, above 0.10. The per-scenario
+    diagnosis is results/t2v2_diagnosis.csv. The draw was not replaced by
+    the median and was not clipped to the true disconnect.

@@ -63,7 +63,6 @@ def main() -> int:
         diagnosis_path = REPO_ROOT / "results" / "t2v2_diagnosis.csv"
         diagnosis.write_csv(diagnosis_path)
         print(f"unmet_p3={unmet_p3:.4f} wrote {diagnosis_path}")
-    print(summary)
     for penalty in M_GRID:
         block = summary.filter(pl.col("M") == penalty)
         print(f"M={penalty}")

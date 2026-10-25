@@ -28,7 +28,7 @@ def main() -> int:
     for axis, util in zip(axes, utils, strict=True):
         block = means.filter(pl.col("util") == util)
         baseline = block.filter(pl.col("policy") == "P0").select(["cap", "cost"]).rename({"cost": "baseline"})
-        for policy, style in (("P1", "-"), ("P3", "-"), ("P4", "o")):
+        for policy, style in (("P1", "-"), ("P3", "--"), ("P4", "o")):
             series = block.filter(pl.col("policy") == policy).join(baseline, on="cap")
             if series.is_empty():
                 continue
@@ -39,7 +39,8 @@ def main() -> int:
         axis.set_title(f"utilization ×{util}")
         axis.legend()
     axes[0].set_ylabel("cost reduction vs P0")
-    figure.suptitle("SCE, T2v2, headline M")
+    share = float(frame.filter(pl.col("policy") == "P3")["penalty_share"].mean())
+    figure.suptitle(f"SCE, T2v2, M=25, mean P3 penalty share {share:.1%}")
     figure.tight_layout()
     dest = REPO_ROOT / "plots" / "cap_sweep.png"
     dest.parent.mkdir(parents=True, exist_ok=True)

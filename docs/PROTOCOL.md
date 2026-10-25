@@ -51,3 +51,9 @@ T2v2 draws one dwell from the empirical distribution of the same station and Los
 The 2019 snapshot has no `userInputs`, so a reproduction on `bank_K50` compares two synthetic deadlines. Reproduction v2 uses only Caltech sessions that declared a `requestedDeparture`.
 
 1,195 sessions pass the filters: site 0002, `kWhDelivered > 0`, and a departure delta in (0, 36 hours]. Their local connections run from 2018-04-30 through 2018-11-13. The child bank is a day-block bootstrap of that subset, skeleton year 2018, 50 years, seed 7. `bank_declared_hash` is `1b0a517fadbbc21d25c370454d25f53ec71ae39f05e2eec2de732b540996a70b` (135,566 rows). It was written here before `scripts/reproduce_v2.py` ran. P3 reads the declared departure shifted onto the resampled connection. Energy stays `kWhDelivered`.
+
+## Headline result (Day 5 amendment, 2026-10-25T14:18:16Z)
+
+`results/m_sensitivity.csv` has the four penalties and P0, P1, P2b, P3, P4. No value in that grid puts both P3 and P4 under a 50% penalty share. P3's share is 0.897 at M = 10 and 0.956 at M = 25. P4's share is 0.109 at M = 10 and 0.232 at M = 25. The candidate stays 25. It was not lowered below the grid, and it was not moved to make P3 beat P1. P3 costs more than P0 at every M. Numbers at M = 25 are not cost claims.
+
+P3 unmet under T2v2 is 0.231, above 0.10. The per-scenario diagnosis is `results/t2v2_diagnosis.csv`. Across the 50 years, 52.5% of drawn deadlines are shorter than the true stay, the median draw is 4.49 hours against a median stay of 5.28 hours, and 18.4% of requested kWh does not fit in the drawn window at the plug limit. 0.20% does not fit in the true stay. P0 unmet is 0.187, in line with that short-window shortfall. P1 and P3 unmet are 0.231; the extra energy is planned on slots after the true disconnect and then zeroed by the plant. The draw was not replaced by the median and was not clipped to the disconnect.

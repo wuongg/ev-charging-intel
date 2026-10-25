@@ -1,4 +1,4 @@
 case,passed,cost_delta,i2_breaches,note
 CH-01,True,-0.12499999999999999,0,drop 10% of sessions; cost must not rise by more than 2%; no phantom charge
-CH-06,True,8.5,0,cap cut to 50%; soft unmet is the priced signal; unmet_kwh=8.5000 priced at M=1000
+CH-06,True,8.5,0,cap cut to 50%; soft unmet is the priced signal; unmet_kwh=8.5000 priced at M=25
 CH-08,True,1.0,0,20% of cars take an extra 0.5 kWh on epoch 0; recovery epochs=1
