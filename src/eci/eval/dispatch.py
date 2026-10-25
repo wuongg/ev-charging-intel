@@ -77,7 +77,7 @@ def sessions_from_rows(
             connection = connection.replace(tzinfo=ZoneInfo("UTC"))
         if disconnect.tzinfo is None:
             disconnect = disconnect.replace(tzinfo=ZoneInfo("UTC"))
-        departure, requested = declared.get(_source_key(str(row["sessionID"])), (None, None))
+        departure, _requested_kwh = declared.get(_source_key(str(row["sessionID"])), (None, None))
         if isinstance(departure, timedelta):
             departure = connection + departure
         if departure is not None and departure <= connection:
@@ -90,7 +90,8 @@ def sessions_from_rows(
                 kwh=kwh,
                 p_max_kw=p_max_kw(row.get("pilot_amp"), nominal_volts, default_kw),
                 requested_departure=departure,
-                kwh_requested=requested,
+                kwh_requested=None,
+                station_id=str(row.get("stationID") or ""),
             )
         )
     return sessions

@@ -21,6 +21,7 @@ class ScenarioSession:
     p_max_kw: float
     requested_departure: datetime | None = None
     kwh_requested: float | None = None
+    station_id: str = ""
 
 
 @dataclass
@@ -42,6 +43,8 @@ def _requirements(session: ScenarioSession, tier: str, median_dwell: timedelta) 
     if tier == "T3":
         return session.disconnect, session.kwh
     if tier == "T2":
+        # T2v2 writes requested_departure before the replay. A missing one
+        # falls back to the single median, which is the Day-4 imputation.
         end = session.requested_departure or (session.connection + median_dwell)
         energy = session.kwh_requested if session.kwh_requested is not None else session.kwh
         return end, float(energy)
