@@ -81,3 +81,10 @@ day6_predictions:
     before the corrected bank runs. Three matched. The misses are P4 ToU
     on the total bill, the magnitude of the P3 versus P0 reduction, and
     reproduction v3 still above 15 percent.
+t2c:
+  amended_at: '2026-10-26T00:00:00Z'
+  beta: 0.5
+  split: two_fold_by_source_session_id
+  text: T2C is the beta-quantile of actual dwell given Los Angeles hour and
+    declared-dwell bucket, fit with a two-fold holdout on source session id.
+    Raw declared is not sent to the planner. Beta is not tuned to shrink VOI.

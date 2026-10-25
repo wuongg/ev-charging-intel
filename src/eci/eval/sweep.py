@@ -10,6 +10,7 @@ import yaml
 
 from eci.config import REPO_ROOT, load_config
 from eci.eval.dispatch import declared_inputs, run_policy_year, sessions_from_rows
+from eci.optimize.calibrate import DEFAULT_BETA, HazardCorrector, corrector_from_parquet
 from eci.optimize.impute import DwellSampler, sampler_from_parquet
 from eci.optimize.policies import charge_on_arrival, cheapest_slots_greedy, earliest_deadline_first
 from eci.optimize.solve import solve_epoch_fast
@@ -21,6 +22,7 @@ UTIL_GRID = (1, 2, 4)
 N_PLUGS = 54
 
 _SAMPLER: DwellSampler | None = None
+_CORRECTOR: HazardCorrector | None = None
 _DECLARED: dict | None = None
 _WINDOWS: list[dict] | None = None
 _DEMAND: float | None = None
@@ -38,6 +40,13 @@ def _sampler() -> DwellSampler:
     if _SAMPLER is None:
         _SAMPLER = sampler_from_parquet(REPO_ROOT / "data" / "interim" / "sessions.parquet")
     return _SAMPLER
+
+
+def _corrector() -> HazardCorrector:
+    global _CORRECTOR
+    if _CORRECTOR is None:
+        _CORRECTOR = corrector_from_parquet(REPO_ROOT / "data" / "interim" / "sessions.parquet")
+    return _CORRECTOR
 
 
 def _declared() -> dict:
@@ -96,12 +105,12 @@ def _prepare(sessions: list, util: int, impute: bool) -> list:
     return fleet
 
 
-def _policies(penalty: float, include_p4: bool):
+def _policies(penalty: float, include_p4: bool, tier: str = "T2"):
     rows = (
-        ("P0", charge_on_arrival, "T2"),
-        ("P1", cheapest_slots_greedy, "T2"),
-        ("P2b", earliest_deadline_first, "T2"),
-        ("P3", _fast(penalty), "T2"),
+        ("P0", charge_on_arrival, tier),
+        ("P1", cheapest_slots_greedy, tier),
+        ("P2b", earliest_deadline_first, tier),
+        ("P3", _fast(penalty), tier),
     )
     if include_p4:
         rows = (*rows, ("P4", _fast(penalty), "T3"))
@@ -272,6 +281,89 @@ def declared_gap_scenario(scenario_id: int, months: set[int] | None = None) -> d
         "penalty_share_p3": p3["penalty_cost"] / p3["total_cost"] if p3["total_cost"] else 0.0,
         "penalty_share_p4": p4["penalty_cost"] / p4["total_cost"] if p4["total_cost"] else 0.0,
         "M": penalty,
+    }
+
+
+def _prepare_t2c(sessions: list, beta: float = DEFAULT_BETA) -> list:
+    """Hazard-corrected deadline. Raw declared is not what the planner sees."""
+    return _corrector().apply(sessions, beta=beta)
+
+
+def comparison_t2c_scenario(scenario_id: int) -> list[dict]:
+    """P0–P4 on both tariffs after T2C. P4 stays the T3 oracle."""
+    fleet = _prepare_t2c(_load("bank_K50.parquet", scenario_id))
+    penalty = headline_penalty()
+    rows: list[dict] = []
+    for tariff, windows, demand in _tariffs():
+        solved = {}
+        for name, policy, tier in _policies(penalty, include_p4=True, tier="T2C"):
+            solved[name] = _score(fleet, policy, tier, name, 150.0, penalty, windows, demand)
+        baseline = solved["P0"]["total_cost"]
+        for name, result in solved.items():
+            rows.append(
+                {
+                    "scenario_id": scenario_id,
+                    "tariff": tariff,
+                    "policy": name,
+                    "tier": "T2C" if name != "P4" else "T3",
+                    "M": penalty,
+                    "total_cost": result["total_cost"],
+                    "energy_cost": result["energy_cost"],
+                    "penalty_cost": result["penalty_cost"],
+                    "unmet_rate": result["unmet_rate"],
+                    "penalty_share": (result["penalty_cost"] / result["total_cost"]) if result["total_cost"] else 0.0,
+                    "reduction_vs_p0": ((baseline - result["total_cost"]) / baseline) if baseline else 0.0,
+                }
+            )
+    return rows
+
+
+def declared_gap_t2c_scenario(scenario_id: int, months: set[int] | None = None, beta: float = DEFAULT_BETA) -> dict:
+    """P3 at T2C versus P4 at T3 on the declared-departure bank."""
+    fleet = _prepare_t2c(_load("bank_declared_K50.parquet", scenario_id), beta=beta)
+    if months is not None:
+        from zoneinfo import ZoneInfo
+
+        zone = ZoneInfo("America/Los_Angeles")
+        fleet = [session for session in fleet if session.connection.astimezone(zone).month in months]
+    penalty = headline_penalty()
+    if not fleet:
+        return {"scenario_id": scenario_id, "gap": float("nan"), "n_sessions": 0, "beta": beta}
+    p3 = _score(fleet, _fast(penalty), "T2C", "P3", 150.0, penalty)
+    p4 = _score(fleet, _fast(penalty), "T3", "P4", 150.0, penalty)
+    gap = (p3["total_cost"] - p4["total_cost"]) / p4["total_cost"] if p4["total_cost"] else float("nan")
+    energy_p3 = p3["energy_cost"] + p3["penalty_cost"]
+    energy_p4 = p4["energy_cost"] + p4["penalty_cost"]
+    energy_gap = (energy_p3 - energy_p4) / energy_p4 if energy_p4 else float("nan")
+    return {
+        "scenario_id": scenario_id,
+        "n_sessions": len(fleet),
+        "beta": beta,
+        "cost_p3": p3["total_cost"],
+        "cost_p4": p4["total_cost"],
+        "gap": gap,
+        "gap_energy_penalty": energy_gap,
+        "unmet_p3": p3["unmet_rate"],
+        "unmet_p4": p4["unmet_rate"],
+        "penalty_share_p3": p3["penalty_cost"] / p3["total_cost"] if p3["total_cost"] else 0.0,
+        "penalty_share_p4": p4["penalty_cost"] / p4["total_cost"] if p4["total_cost"] else 0.0,
+        "M": penalty,
+    }
+
+
+def t2c_dial_scenario(task: tuple[int, float]) -> dict:
+    scenario_id, beta = task
+    penalty = headline_penalty()
+    fleet = _prepare_t2c(_load("bank_K50.parquet", scenario_id), beta=beta)
+    result = _score(fleet, _fast(penalty), "T2C", "P3", 150.0, penalty)
+    return {
+        "scenario_id": scenario_id,
+        "beta": beta,
+        "M": penalty,
+        "energy_cost": result["energy_cost"],
+        "unmet_pct": result["unmet_rate"] * 100.0,
+        "total_cost": result["total_cost"],
+        "penalty_share": (result["penalty_cost"] / result["total_cost"]) if result["total_cost"] else 0.0,
     }
 
 

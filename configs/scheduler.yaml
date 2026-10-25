@@ -13,6 +13,8 @@ penalty_unmet_headline: 25.0
 # and does not change the default used by the bank runs.
 deadline_quantile: null
 deadline_quantile_grid: [0.25, 0.5, 0.75, 0.9]
+# T2C default. Not tuned against VOI. Sensitivity is beta in {0.25, 0.5, 0.75}.
+t2c_beta: 0.5
 epsilon_peak: null
 committed_k: 1
 nominal_volts: 208

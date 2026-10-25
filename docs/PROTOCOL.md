@@ -65,3 +65,9 @@ The 3-tier design says the plant is the physical session and the tier is only wh
 Fix, in `src/eci/simulate/engine.py`: a command is delivered only inside `[connection, disconnect)`. The policy horizon stays the tier belief while that belief is still in the future. Once the belief has expired and the plug is still in, the policy is told the current slot only. It is not told the future disconnect. Invariant I9 checks that committed power is gated by the physical plug. `tests/test_plant_semantics.py` locks the split. M, k, the embargo, and the tariffs are unchanged.
 
 Predictions for the corrected plant were written to `results/day6_predictions.csv` at 2026-10-25T14:46:00Z, before the bank re-runs. Three of six bands matched. The misses are recorded in that file.
+
+## Hazard-corrected T2C (Day 7 amendment, 2026-10-26T00:00:00Z)
+
+A declared deadline is not the physical unplug. On the 1,195 Caltech 2018 sessions that have both, the median declared dwell is 0.29 hours *shorter* than the stay (declared is earlier). 37.5% of those sessions declare *later* than they stay. Those late beliefs are what make cheapest-slot wait after the car has left.
+
+T2C replaces the believed deadline with the β-quantile of actual dwell in the same Los Angeles hour and declared-dwell bucket. β = 0.5 is the default and is not moved to shrink VOI. Sessions are hashed into two folds; a session is scored with the fold that was not fit on it. Energy stays `kWhDelivered`. The plant is still the recorded disconnect (I9). Predictions for the T2C runs were written to `results/day7_predictions.csv` before those runs.

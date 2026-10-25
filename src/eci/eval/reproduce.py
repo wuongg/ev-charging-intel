@@ -109,6 +109,26 @@ def reproduction_table(frame: pl.DataFrame) -> list[dict]:
     return rows
 
 
+def reproduce_pscc_v4(gaps: list[float], *, m_headline: float, beta: float, prov: dict) -> dict:
+    """Mean (cost_P3_T2C - cost_P4) / cost_P4 on the declared-departure bank."""
+    gap = float(sum(gaps) / len(gaps)) if gaps else float("nan")
+    return {
+        "metric": "pscc_v4_t2c",
+        "literature_value": LITERATURE_GAP,
+        "repo_value": gap,
+        "delta_pp": (gap - LITERATURE_GAP) * 100.0,
+        "window": "bank_declared_K50_2018",
+        "tariff": "sce_tou_ev_4_march_2019",
+        "M": m_headline,
+        "beta": beta,
+        "notes": (
+            "P3 plans on the hazard-corrected deadline (cross-fit, beta). "
+            "The plant uses the recorded disconnect. Energy is kWhDelivered."
+        ),
+        **prov,
+    }
+
+
 def reproduce_pscc_v2(gaps: list[float], *, m_headline: float, prov: dict) -> dict:
     """Mean (cost_P3 - cost_P4) / cost_P4 on the declared-departure bank."""
     gap = float(sum(gaps) / len(gaps)) if gaps else float("nan")

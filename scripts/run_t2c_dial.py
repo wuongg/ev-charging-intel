@@ -1,0 +1,38 @@
+"""T2C beta dial on 20 scenarios, SCE, headline M."""
+
+from __future__ import annotations
+
+import sys
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
+import polars as pl
+
+from eci.config import REPO_ROOT, provenance
+from eci.eval.sweep import t2c_dial_scenario
+
+BETA_GRID = (0.25, 0.5, 0.75)
+
+
+def main() -> int:
+    bank = REPO_ROOT / "scenarios" / "bank_K50.parquet"
+    if not bank.exists():
+        print(f"missing {bank}", file=sys.stderr)
+        return 1
+    prov = provenance(REPO_ROOT / "configs" / "scheduler.yaml")
+    ids = pl.read_parquet(bank).select("scenario_id").unique().sort("scenario_id")["scenario_id"].to_list()[:20]
+    tasks = [(int(scenario_id), beta) for scenario_id in ids for beta in BETA_GRID]
+    rows: list[dict] = []
+    with ProcessPoolExecutor(max_workers=4) as pool:
+        futures = [pool.submit(t2c_dial_scenario, task) for task in tasks]
+        for done, future in enumerate(as_completed(futures), start=1):
+            rows.append(future.result())
+            print(f"t2c_dial={done}/{len(tasks)}", flush=True)
+    frame = pl.DataFrame(rows).with_columns([pl.lit(prov[key]).alias(key) for key in prov])
+    dest = REPO_ROOT / "results" / "t2c_dial.csv"
+    frame.write_csv(dest)
+    print(f"wrote {dest} rows={frame.height}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -4,7 +4,17 @@ from __future__ import annotations
 
 from eci.config import REPO_ROOT
 from eci.eval.dispatch import sessions_from_rows
-from eci.eval.sweep import _declared, _load, _policies, _prepare, _sampler, _score, _tariffs
+from eci.eval.sweep import (
+    DEFAULT_BETA,
+    _declared,
+    _load,
+    _policies,
+    _prepare,
+    _prepare_t2c,
+    _sampler,
+    _score,
+    _tariffs,
+)
 
 # Commute assumption, labeled wherever the scaled figure is printed.
 SESSIONS_PER_VEHICLE_YEAR = 200
@@ -64,6 +74,17 @@ def _emit(scenario_id: int, bank: str, fleet, tariff: str, windows, demand, info
                 "unmet_t3": solved["t3"]["unmet_rate"],
             }
         )
+    return rows
+
+
+def voi_t2c_scenario(scenario_id: int, beta: float = DEFAULT_BETA) -> list[dict]:
+    """Hazard-corrected deadline versus the oracle. Frozen bank, energy is delivered kWh."""
+    fleet = _prepare_t2c(_load("bank_K50.parquet", scenario_id), beta=beta)
+    rows: list[dict] = []
+    for tariff, windows, demand in _tariffs():
+        for row in _emit(scenario_id, "bank_K50", fleet, tariff, windows, demand, "deadline_t2c"):
+            row["beta"] = beta
+            rows.append(row)
     return rows
 
 

@@ -43,9 +43,9 @@ def _floor_slot(moment: datetime, minutes: int) -> datetime:
 def _requirements(session: ScenarioSession, tier: str, median_dwell: timedelta) -> tuple[datetime, float]:
     if tier == "T3":
         end = session.disconnect
-    elif tier == "T2":
-        # T2v2 writes requested_departure before the replay. A missing one
-        # falls back to the single median, which is the Day-4 imputation.
+    elif tier in ("T2", "T2C"):
+        # T2 keeps a raw or T2v2 deadline. T2C overwrites it with the
+        # hazard-corrected quantile before the replay.
         end = session.requested_departure or (session.connection + median_dwell)
     else:
         raise ValueError(f"tier {tier} is not run on day 3")
