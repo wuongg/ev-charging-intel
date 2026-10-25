@@ -108,8 +108,23 @@ def _policies(penalty: float, include_p4: bool):
     return rows
 
 
-def _score(sessions, policy, tier, name, cap, penalty) -> dict:
-    windows, demand = _sce()
+def _tariffs() -> list[tuple[str, list[dict], float]]:
+    sce_windows, sce_demand = _sce()
+    evn = load_config(REPO_ROOT / "configs" / "tariff_evn_2026.yaml").model_dump()
+    two_part = yaml.safe_load((REPO_ROOT / "configs" / "tariff_evn_twopart.yaml").read_text(encoding="utf-8"))
+    return [
+        ("sce_ev4", sce_windows, sce_demand),
+        (
+            "evn_2026",
+            evn["windows"],
+            float(two_part["capacity_charge_vnd_per_kw_month"]["kv22_to_110"]),
+        ),
+    ]
+
+
+def _score(sessions, policy, tier, name, cap, penalty, windows=None, demand=None) -> dict:
+    if windows is None or demand is None:
+        windows, demand = _sce()
     return run_policy_year(
         sessions,
         policy,
@@ -198,6 +213,34 @@ def m_sensitivity_scenario(scenario_id: int) -> dict:
                 row["reduction_vs_p0"] = (baseline - row["total_cost"]) / baseline
         scored.extend(pending)
     return {"rows": scored, "diagnosis": _deadline_diagnosis(scenario_id, fleet, solved)}
+
+
+def comparison_scenario(scenario_id: int) -> list[dict]:
+    """P0–P4 on both tariffs at the headline penalty. The schedule ignores M on these prices."""
+    fleet = _prepare(_load("bank_K50.parquet", scenario_id), util=1, impute=True)
+    penalty = headline_penalty()
+    rows: list[dict] = []
+    for tariff, windows, demand in _tariffs():
+        solved = {}
+        for name, policy, tier in _policies(penalty, include_p4=True):
+            solved[name] = _score(fleet, policy, tier, name, 150.0, penalty, windows, demand)
+        baseline = solved["P0"]["total_cost"]
+        for name, result in solved.items():
+            rows.append(
+                {
+                    "scenario_id": scenario_id,
+                    "tariff": tariff,
+                    "policy": name,
+                    "M": penalty,
+                    "total_cost": result["total_cost"],
+                    "energy_cost": result["energy_cost"],
+                    "penalty_cost": result["penalty_cost"],
+                    "unmet_rate": result["unmet_rate"],
+                    "penalty_share": (result["penalty_cost"] / result["total_cost"]) if result["total_cost"] else 0.0,
+                    "reduction_vs_p0": ((baseline - result["total_cost"]) / baseline) if baseline else 0.0,
+                }
+            )
+    return rows
 
 
 def declared_gap_scenario(scenario_id: int, months: set[int] | None = None) -> dict:
