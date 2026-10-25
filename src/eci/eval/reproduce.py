@@ -109,6 +109,25 @@ def reproduction_table(frame: pl.DataFrame) -> list[dict]:
     return rows
 
 
+def reproduce_pscc_v2(gaps: list[float], *, m_headline: float, prov: dict) -> dict:
+    """Mean (cost_P3 - cost_P4) / cost_P4 on the declared-departure bank."""
+    gap = float(sum(gaps) / len(gaps)) if gaps else float("nan")
+    return {
+        "metric": "pscc_v2_declared_departure",
+        "literature_value": LITERATURE_GAP,
+        "repo_value": gap,
+        "delta_pp": (gap - LITERATURE_GAP) * 100.0,
+        "window": "bank_declared_K50_2018",
+        "tariff": "sce_tou_ev_4_march_2019",
+        "M": m_headline,
+        "notes": (
+            "P3 uses the shifted requestedDeparture. Energy is kWhDelivered. "
+            "Bill is energy + headline M * unmet + monthly demand."
+        ),
+        **prov,
+    }
+
+
 def write_reproduction(frame: pl.DataFrame, prov: dict, dest: Path | None = None) -> Path:
     from eci.config import REPO_ROOT
 
