@@ -1,5 +1,8 @@
 slot_minutes: 15
-# TODO: penalty M, epsilon_peak, and committed_k when the LP is formulated.
-penalty_unmet: null
+# Frozen on day 3. Not tuned against the E2E cost.
+# 1000 USD/kWh is large next to the 0.10–0.40 placeholder tariff, so the LP
+# meets energy whenever the window and the cap allow it.
+penalty_unmet: 1000.0
 epsilon_peak: null
-committed_k: null
+committed_k: 1
+nominal_volts: 208

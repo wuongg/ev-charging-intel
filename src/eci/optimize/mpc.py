@@ -1,1 +1,174 @@
-"""Not implemented yet (week 1)."""
+"""15-minute MPC. The first k slots of each solve are locked. T1 is not run."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+
+import numpy as np
+
+from eci.optimize.feasibility import assert_feasible
+from eci.optimize.formulation import slot_price
+from eci.optimize.state import FleetState, Schedule, Vehicle
+
+
+@dataclass
+class ScenarioSession:
+    session_id: str
+    connection: datetime
+    disconnect: datetime
+    kwh: float
+    p_max_kw: float
+    requested_departure: datetime | None = None
+    kwh_requested: float | None = None
+
+
+@dataclass
+class ReplayLog:
+    policy_name: str
+    tier: str
+    schedule: Schedule
+    running_peak_kw: float
+    dual_log: list[dict]
+
+
+def _floor_slot(moment: datetime, minutes: int) -> datetime:
+    discard = (moment.minute % minutes) * 60 + moment.second
+    return (moment - timedelta(seconds=discard)).replace(microsecond=0)
+
+
+def _requirements(session: ScenarioSession, tier: str, median_dwell: timedelta) -> tuple[datetime, float]:
+    if tier == "T3":
+        return session.disconnect, session.kwh
+    if tier == "T2":
+        end = session.requested_departure or (session.connection + median_dwell)
+        energy = session.kwh_requested if session.kwh_requested is not None else session.kwh
+        return end, float(energy)
+    raise ValueError(f"tier {tier} is not run on day 3")
+
+
+class MPCLoop:
+    def __init__(
+        self,
+        *,
+        slot_minutes: int,
+        committed_k: int,
+        penalty_unmet: float,
+        cap_kw: float,
+        tariff_windows: list[dict],
+        timezone_name: str,
+        median_dwell: timedelta,
+    ):
+        self.slot_minutes = slot_minutes
+        self.committed_k = committed_k
+        self.penalty_unmet = penalty_unmet
+        self.cap_kw = cap_kw
+        self.tariff_windows = tariff_windows
+        self.timezone_name = timezone_name
+        self.median_dwell = median_dwell
+
+    def run(self, sessions: list[ScenarioSession], policy, tier: str, policy_name: str) -> ReplayLog:
+        if not sessions:
+            raise ValueError("scenario day has no sessions")
+        start = _floor_slot(min(session.connection for session in sessions), self.slot_minutes)
+        end = max(session.disconnect for session in sessions)
+        step = timedelta(minutes=self.slot_minutes)
+        slots: list[datetime] = []
+        cursor = start
+        while cursor < end:
+            slots.append(cursor)
+            cursor += step
+        n_i = len(sessions)
+        n_t = len(slots)
+        committed = np.zeros((n_i, n_t))
+        delivered = np.zeros(n_i)
+        dt = self.slot_minutes / 60.0
+        requirements = [_requirements(session, tier, self.median_dwell) for session in sessions]
+        running_peak = 0.0
+        dual_log: list[dict] = []
+        epoch = 0
+        while epoch < n_t:
+            now = slots[epoch]
+            vehicles: list[Vehicle] = []
+            active_index: list[int] = []
+            for index, session in enumerate(sessions):
+                end_time, energy = requirements[index]
+                if session.connection > now or end_time <= now:
+                    continue
+                remaining = max(energy - delivered[index], 0.0)
+                vehicles.append(
+                    Vehicle(
+                        vehicle_id=session.session_id,
+                        energy_remaining_kwh=remaining,
+                        battery_max_kwh=max(energy, 0.0),
+                        window_start=max(session.connection, now),
+                        window_end=end_time,
+                        p_max_kw=session.p_max_kw,
+                        arrival=session.connection,
+                    )
+                )
+                active_index.append(index)
+            horizon = slots[epoch:]
+            prices = np.array(
+                [slot_price(slot, self.tariff_windows, self.timezone_name) for slot in horizon],
+                dtype=float,
+            )
+            state = FleetState(vehicles=vehicles, running_peak_kw=running_peak, slot_minutes=self.slot_minutes)
+            schedule = policy(state, horizon, prices, self.cap_kw, dt)
+            assert_feasible(schedule, state, cap_kw=self.cap_kw)
+            k = min(self.committed_k, len(horizon))
+            for local, index in enumerate(active_index):
+                committed[index, epoch : epoch + k] = schedule.power_kw[local, :k]
+                delivered[index] += float(schedule.power_kw[local, :k].sum() * dt)
+            peak_now = float(schedule.power_kw[:, :k].sum(axis=0).max()) if k and schedule.power_kw.size else 0.0
+            running_peak = max(running_peak, peak_now)
+            if schedule.cap_duals is not None:
+                dual_log.append(
+                    {
+                        "epoch": now.isoformat(),
+                        "cap_duals": [float(value) for value in schedule.cap_duals[:k]],
+                    }
+                )
+            epoch += k
+        prices_all = np.array(
+            [slot_price(slot, self.tariff_windows, self.timezone_name) for slot in slots],
+            dtype=float,
+        )
+        unmet = np.array(
+            [max(requirements[index][1] - delivered[index], 0.0) for index in range(n_i)],
+            dtype=float,
+        )
+        # Final check uses the original requirements, not the last epoch's remainder.
+        final_vehicles = []
+        for index, session in enumerate(sessions):
+            end_time, energy = requirements[index]
+            final_vehicles.append(
+                Vehicle(
+                    vehicle_id=session.session_id,
+                    energy_remaining_kwh=energy,
+                    battery_max_kwh=max(energy, 0.0),
+                    window_start=session.connection,
+                    window_end=end_time,
+                    p_max_kw=session.p_max_kw,
+                    arrival=session.connection,
+                )
+            )
+        final = Schedule(
+            vehicle_ids=[session.session_id for session in sessions],
+            slot_starts=slots,
+            power_kw=committed,
+            unmet_kwh=unmet,
+            prices=prices_all,
+            cap_kw=self.cap_kw,
+            dt_hours=dt,
+            status=policy_name,
+            epoch_duals=dual_log,
+        )
+        assert_feasible(final, FleetState(final_vehicles, running_peak_kw=running_peak), cap_kw=self.cap_kw)
+        return ReplayLog(
+            policy_name=policy_name,
+            tier=tier,
+            schedule=final,
+            running_peak_kw=running_peak,
+            dual_log=dual_log,
+        )
