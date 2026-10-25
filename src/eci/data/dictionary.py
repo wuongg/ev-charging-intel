@@ -90,3 +90,25 @@ def build_data_dictionary(
     )
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text("\n".join(lines), encoding="utf-8")
+    _restore_measured_hazards(dest)
+
+
+def _restore_measured_hazards(dest: Path) -> None:
+    """Keep the day-2 hazard section when `make audit` regenerates this file."""
+    import csv
+
+    from eci.config import REPO_ROOT
+
+    csv_path = REPO_ROOT / "results" / "hazard_metrics.csv"
+    if not csv_path.exists():
+        return
+    with csv_path.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    for row in rows:
+        raw = row.get("value")
+        row["value"] = None if raw in (None, "", "None") else float(raw)
+        row["n"] = int(row["n"])
+        row["low_confidence"] = str(row["low_confidence"]).lower() == "true"
+    from eci.data.measures import upsert_hazard_section
+
+    upsert_hazard_section(dest, rows)
