@@ -196,12 +196,41 @@ def overdispersion_test(hourly: pl.DataFrame) -> dict:
     }
 
 
+def iced_true_rate(df: pl.DataFrame) -> dict:
+    """Time-weighted share of plugged time with charging current below 1 A.
+
+    Weights are session dwell hours. This is the minute-level rate from path B1.
+    Sessions without ``iced_fraction`` are left out of the denominator.
+    """
+    if "iced_fraction" not in df.columns:
+        return {"n": 0, "p_iced": None, "low_confidence": True}
+    dwell_h = (pl.col("disconnectTime_utc") - pl.col("connectionTime_utc")).dt.total_seconds() / 3600.0
+    valid = df.filter(pl.col("iced_fraction").is_not_null()).with_columns(dwell_h.alias("dwell_h"))
+    valid = valid.filter(pl.col("dwell_h") > 0)
+    n = valid.height
+    if n == 0:
+        return {"n": 0, "p_iced": None, "low_confidence": True}
+    weight = float(valid["dwell_h"].sum())
+    weighted = float((valid["iced_fraction"] * valid["dwell_h"]).sum())
+    return {
+        "n": n,
+        "p_iced": (weighted / weight) if weight else None,
+        "low_confidence": n < LOW_CONFIDENCE_N,
+    }
+
+
 def hazard_rows(sessions: pl.DataFrame, hourly: pl.DataFrame) -> list[dict]:
     """Flat metric rows for results/hazard_metrics.csv."""
     early = early_unplug_compliance(sessions)
     overstay = overstay_rate(sessions)
     iced = iced_proxy_session_level(sessions)
+    true_iced = iced_true_rate(sessions)
     dispersion = overdispersion_test(hourly)
+    iced_note = "minute-level, from B1"
+    if true_iced["p_iced"] and iced["p_iced_proxy"] is not None:
+        relative = abs(iced["p_iced_proxy"] - true_iced["p_iced"]) / true_iced["p_iced"]
+        if relative > 0.5:
+            iced_note += f"; proxy differs by {relative:.0%} relative"
     rows = [
         _row(
             "early_unplug_rate",
@@ -251,6 +280,13 @@ def hazard_rows(sessions: pl.DataFrame, hourly: pl.DataFrame) -> list[dict]:
             iced["n"],
             iced["low_confidence"],
             "PROXY: kWh < 0.25 * dwell_h * station median kW. Not minute-level ICED.",
+        ),
+        _row(
+            "iced_true_rate",
+            true_iced["p_iced"],
+            true_iced["n"],
+            true_iced["low_confidence"],
+            iced_note,
         ),
         _row(
             "overdispersion_mean_var_mean_ratio",
