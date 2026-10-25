@@ -79,6 +79,8 @@ class Invariant(str, Enum):
     I7 causality: a decision at t uses only information available at t
         (userInputs snapshot at or before connection; never doneChargingTime).
     I8 independent check: the feasibility checker agrees on every emitted schedule.
+    I9 plant-actual separation: committed power is gated by the physical plug
+        (connection, disconnect), never by a declared or imputed deadline.
     """
 
     I1_SITE_CAP = "I1"
@@ -89,3 +91,4 @@ class Invariant(str, Enum):
     I6_PEAK_EPIGRAPH = "I6"
     I7_CAUSALITY = "I7"
     I8_INDEPENDENT_CHECK = "I8"
+    I9_PLANT_ACTUAL = "I9"

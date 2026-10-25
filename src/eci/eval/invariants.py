@@ -6,6 +6,7 @@ import numpy as np
 
 from eci.optimize.mpc import ScenarioSession
 from eci.optimize.state import Schedule
+from eci.simulate.engine import admits
 
 
 class InvariantError(RuntimeError):
@@ -20,7 +21,7 @@ def check_invariants(
     *,
     tol: float = 1e-4,
 ) -> list[str]:
-    """I1 hard cap, I2 no energy outside the physical plug, I3 command within p_max."""
+    """I1 hard cap, I2 no phantom energy, I3 command within p_max, I9 plant uses the plug only."""
     violations: list[str] = []
     power = np.asarray(schedule.power_kw, dtype=float)
     if power.ndim != 2 or power.shape[0] != len(sessions):
@@ -34,11 +35,13 @@ def check_invariants(
         for t, slot in enumerate(schedule.slot_starts):
             if power[index, t] <= tol:
                 continue
-            if not (session.connection <= slot < session.disconnect):
+            outside = not admits(session, slot)
+            if outside:
                 violations.append("I2 phantom")
-                break
-            if power[index, t] > session.p_max_kw + tol:
+                violations.append("I9 plant")
+            elif power[index, t] > session.p_max_kw + tol:
                 violations.append("I3 c-rate")
+            if outside or power[index, t] > session.p_max_kw + tol:
                 break
     return violations
 

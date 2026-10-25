@@ -10,6 +10,7 @@ import numpy as np
 from eci.optimize.feasibility import assert_feasible
 from eci.optimize.formulation import slot_price
 from eci.optimize.state import FleetState, Schedule, Vehicle
+from eci.simulate.engine import clip_command, planning_end
 
 
 @dataclass
@@ -101,10 +102,8 @@ class MPCLoop:
             vehicles: list[Vehicle] = []
             active_index: list[int] = []
             for index, session in enumerate(sessions):
-                end_time, energy = requirements[index]
-                if session.connection > now or end_time <= now:
-                    continue
-                if session.disconnect <= now:
+                belief_end, energy = requirements[index]
+                if not (session.connection <= now < session.disconnect):
                     continue
                 remaining = max(energy - delivered[index], 0.0)
                 if remaining <= 1e-9:
@@ -115,7 +114,7 @@ class MPCLoop:
                         energy_remaining_kwh=remaining,
                         battery_max_kwh=max(energy, 0.0),
                         window_start=max(session.connection, now),
-                        window_end=end_time,
+                        window_end=planning_end(belief_end, now, step),
                         p_max_kw=session.p_max_kw,
                         arrival=session.connection,
                     )
@@ -137,12 +136,8 @@ class MPCLoop:
             assert_feasible(schedule, state, cap_kw=self.cap_kw)
             k = min(self.committed_k, len(horizon))
             for local, index in enumerate(active_index):
-                commanded = np.array(schedule.power_kw[local, :k], dtype=float, copy=True)
                 session = sessions[index]
-                for j in range(k):
-                    slot = horizon[j]
-                    if not (session.connection <= slot < session.disconnect):
-                        commanded[j] = 0.0
+                commanded = clip_command(schedule.power_kw[local, :k], horizon[:k], session)
                 committed[index, epoch : epoch + k] = commanded
                 delivered[index] += float(commanded.sum() * dt)
             extra_cost = 0.0
@@ -167,16 +162,18 @@ class MPCLoop:
             dtype=float,
         )
         # Final check uses the original requirements, not the last epoch's remainder.
+        # The committed trajectory is a plant record. Its feasible window is the
+        # physical plug, which can outlast the deadline the policy believed.
         final_vehicles = []
         for index, session in enumerate(sessions):
-            end_time, energy = requirements[index]
+            _belief_end, energy = requirements[index]
             final_vehicles.append(
                 Vehicle(
                     vehicle_id=session.session_id,
                     energy_remaining_kwh=energy,
                     battery_max_kwh=max(energy, 0.0),
                     window_start=session.connection,
-                    window_end=end_time,
+                    window_end=session.disconnect,
                     p_max_kw=session.p_max_kw,
                     arrival=session.connection,
                 )
