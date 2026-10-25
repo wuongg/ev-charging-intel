@@ -1,0 +1,29 @@
+# Local snapshots. The manifest (hashes only) is committed.
+data/*
+!data/manifest.yaml
+!data/raw/
+!data/interim/
+data/raw/*
+!data/raw/.gitkeep
+data/interim/*
+!data/interim/.gitkeep
+
+models/*
+!models/.gitkeep
+scenarios/*
+!scenarios/.gitkeep
+
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+*.part
+
+# Parquet is local except published result tables.
+*.parquet
+!results/**/*.parquet
+!results/*.parquet

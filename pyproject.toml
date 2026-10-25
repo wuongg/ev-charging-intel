@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eci"
+version = "0.1.0"
+description = "EV Fleet Charging Intelligence"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "EV Fleet Charging Intelligence contributors" }]
+dependencies = [
+    "pandas",
+    "polars",
+    "pyarrow",
+    "duckdb",
+    "lightgbm",
+    "scikit-learn",
+    "scipy>=1.10",
+    "highspy",
+    "pydantic>=2",
+    "pyyaml",
+    "fastapi",
+    "uvicorn",
+    "pytest",
+    "ruff",
+    "matplotlib",
+    "tqdm",
+    "python-dateutil",
+    "requests",
+    "orjson",
+]
+
+# Day 1 does not install these. They are recorded so later weeks can opt in
+# without rediscovering the package names. Do not add them to the default lock.
+[project.optional-dependencies]
+forecast-frontier = ["chronos-forecasting"]
+flow = ["ortools"]
+sobol = ["SALib"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["eci"]
