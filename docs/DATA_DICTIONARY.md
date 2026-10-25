@@ -68,14 +68,15 @@ ICED is a session-level proxy; the minute-level rate needs per-minute profiles.
 | `early_unplug_median_gap_min` | -25.75 | 1085 | False | Median of requestedDeparture minus disconnect, in minutes |
 | `overstay_rate_15min` | 0.59513 | 12977 | False | P(disconnect - doneCharging > 15 min) after dropping f_clock_skew |
 | `overstay_rate_1h` | 0.480388 | 12977 | False | P(disconnect - doneCharging > 1h) after dropping f_clock_skew |
-| `iced_proxy_rate` | 0.112641 | 12198 | False | PROXY: kWh < 0.25 * dwell_h * station median kW. Not minute-level ICED. |
-| `overdispersion_mean_var_mean_ratio` | 1.36903 | 4855 | False | Mean across clock hours of var/mean of n_sessions. >>1 rejects Poisson. |
-| `overdispersion_max_var_mean_ratio` | 4.89223 | 4855 | False | Max hour-of-day var/mean, hour=8 |
+| `iced_proxy_rate` | 0.491535 | 48849 | False | PROXY: kWh < 0.25 * dwell_h * station median kW. Not minute-level ICED. |
+| `iced_true_rate` | 0.536565 | 59440 | False | minute-level, from B1 |
+| `overdispersion_mean_var_mean_ratio` | 5.48947 | 22861 | False | Mean across clock hours of var/mean of n_sessions. >>1 rejects Poisson. |
+| `overdispersion_max_var_mean_ratio` | 60.9117 | 22861 | False | Max hour-of-day var/mean, hour=22 |
 
-- git_sha: `bb3d80e7845cb088f56f4cb71425896c73fecbc7`
+- git_sha: `e4d8f4bcc052f8676653f63169f2565248b88bc0`
 - config_hash: `bec119858bb4a878b2493b926dcee23f7234f698848de5c30d1f919d94ae1397`
-- data_hash: `019351fabd57b306ec4c9f5a33e95a8e47b98b1cf4a62c70976e701416812291`
-- utc_now: `2026-10-25T09:42:24Z`
+- data_hash: `3bca5d4970f1e47224c42b10f19116f84161cec7637a7ca615c538022bf420c2`
+- utc_now: `2026-10-25T10:31:50Z`
 
 ## TODO verify before any cost or capacity claim
 
