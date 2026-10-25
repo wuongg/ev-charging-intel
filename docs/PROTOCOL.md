@@ -19,3 +19,15 @@ These were not tuned to the end-to-end number:
 - embargo stays 336 hours and restricts training rows only
 - unmet penalty `M = 1000` USD/kWh in `configs/scheduler.yaml`
 - committed horizon `k = 1` slot
+
+## Zero-kWh sessions (Day 4 amendment)
+
+43.5% of the B1 snapshot has `kWhDelivered == 0`. Those rows occupy a plug and do not request energy.
+
+Decision, recorded before the Day-4 bank run: keep a zero-kWh session when measuring occupancy or congestion, and do not count it as energy need. The frozen bank `bank_hash` `7484043270ba761c133346447998fee64d0bb254b84d30befebcd15365ac1c32` was drawn with `kWh > 0`, so that file has zero-kWh sessions in neither role. The bank is not rebuilt.
+
+## Primary comparison (Day 4 amendment)
+
+The pre-registered primary comparison is P3 against P1 on `sce_ev4`, both at tier T2 (declared inputs plus the imputed deadline). P4 is the T3 oracle and is not in the primary test. The family of secondary comparisons is every other policy pair reported in `results/inference.csv`. Benjamini–Hochberg uses `bh_fdr_q: 0.10`, and the primary test is inside that family so its reported p-value is adjusted.
+
+EVN energy prices are in VND and sit above the frozen numeric penalty if that penalty is read as VND per kWh. The scheduler still delivers every kWh the plugs and the cap allow. Unmet energy, when the cap or the plug limit leaves some, is scored at the frozen `M = 1000` in the tariff's own currency. SCE and EVN totals are not converted into one currency. Both tariffs are applied on the `America/Los_Angeles` clock of the Caltech sessions. The demand charge is added when the bill is scored; it is not a term in the LP.

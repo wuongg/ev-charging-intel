@@ -1,5 +1,16 @@
-primary_comparison: null
+primary_comparison:
+  policy_a: P3
+  policy_b: P1
+  tariff: sce_ev4
+  tier: T2
+  test: paired_one_sided_cost
 bh_fdr_q: 0.1
+zero_kwh:
+  decision: keep_for_occupancy_exclude_from_energy
+  amendment: Sessions with kWhDelivered == 0 stay in the occupancy and congestion
+    accounting and are not an energy requirement. The frozen K=50 bank was drawn
+    with a kWh > 0 filter, so this file contains them in neither role. The bank
+    is not rebuilt and bank_hash is unchanged.
 seeds: []
 bank_hash: 7484043270ba761c133346447998fee64d0bb254b84d30befebcd15365ac1c32
 regime:
