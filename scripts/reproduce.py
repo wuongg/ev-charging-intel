@@ -1,12 +1,22 @@
-"""Not implemented yet (week 2)."""
+"""Write results/reproduction.csv from results/metrics.csv."""
 
 from __future__ import annotations
 
 import sys
 
+import polars as pl
+
+from eci.config import REPO_ROOT, provenance
+from eci.eval.reproduce import write_reproduction
+
 
 def main() -> int:
-    print("not implemented yet (week 2)")
+    path = REPO_ROOT / "results" / "metrics.csv"
+    if not path.exists():
+        print(f"missing {path}; run scripts/run_policies.py first", file=sys.stderr)
+        return 1
+    frame = pl.read_csv(path, infer_schema_length=None)
+    write_reproduction(frame, provenance(REPO_ROOT / "configs" / "scheduler.yaml"))
     return 0
 
 

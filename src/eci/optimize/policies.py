@@ -43,8 +43,28 @@ def charge_on_arrival(
     dt_hours: float,
 ) -> Schedule:
     """Max power immediately, truncated by the cap in arrival order (FIFO)."""
+    return _fill_now(state, slot_starts, prices, cap_kw, dt_hours, by_deadline=False)
+
+
+def earliest_deadline_first(
+    state: FleetState,
+    slot_starts: list,
+    prices: np.ndarray,
+    cap_kw: float,
+    dt_hours: float,
+) -> Schedule:
+    """P2b. Each slot serves the earliest deadline first, up to the cap."""
+    return _fill_now(state, slot_starts, prices, cap_kw, dt_hours, by_deadline=True)
+
+
+def _fill_now(state, slot_starts, prices, cap_kw, dt_hours, by_deadline: bool) -> Schedule:
     power = _blank(state, slot_starts, prices, cap_kw, dt_hours)
-    order = sorted(range(len(state.vehicles)), key=lambda index: (state.vehicles[index].arrival, index))
+    if by_deadline:
+        order = sorted(range(len(state.vehicles)), key=lambda index: (state.vehicles[index].window_end, index))
+        name = "earliest_deadline_first"
+    else:
+        order = sorted(range(len(state.vehicles)), key=lambda index: (state.vehicles[index].arrival, index))
+        name = "charge_on_arrival"
     need = [max(vehicle.energy_remaining_kwh, 0.0) for vehicle in state.vehicles]
     for t, slot in enumerate(slot_starts):
         left = cap_kw
@@ -58,7 +78,7 @@ def charge_on_arrival(
             power[index, t] = take
             need[index] -= take * dt_hours
             left -= take
-    return _finish(state, power, slot_starts, prices, cap_kw, dt_hours, "charge_on_arrival")
+    return _finish(state, power, slot_starts, prices, cap_kw, dt_hours, name)
 
 
 def cheapest_slots_greedy(

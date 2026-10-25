@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -30,6 +30,7 @@ class ReplayLog:
     schedule: Schedule
     running_peak_kw: float
     dual_log: list[dict]
+    epoch_costs: list[float] = field(default_factory=list)
 
 
 def _floor_slot(moment: datetime, minutes: int) -> datetime:
@@ -67,7 +68,7 @@ class MPCLoop:
         self.timezone_name = timezone_name
         self.median_dwell = median_dwell
 
-    def run(self, sessions: list[ScenarioSession], policy, tier: str, policy_name: str) -> ReplayLog:
+    def run(self, sessions: list[ScenarioSession], policy, tier: str, policy_name: str, plant_hook=None) -> ReplayLog:
         if not sessions:
             raise ValueError("scenario day has no sessions")
         start = _floor_slot(min(session.connection for session in sessions), self.slot_minutes)
@@ -84,8 +85,13 @@ class MPCLoop:
         delivered = np.zeros(n_i)
         dt = self.slot_minutes / 60.0
         requirements = [_requirements(session, tier, self.median_dwell) for session in sessions]
+        prices_all = np.array(
+            [slot_price(slot, self.tariff_windows, self.timezone_name) for slot in slots],
+            dtype=float,
+        )
         running_peak = 0.0
         dual_log: list[dict] = []
+        epoch_costs: list[float] = []
         epoch = 0
         while epoch < n_t:
             now = slots[epoch]
@@ -95,7 +101,11 @@ class MPCLoop:
                 end_time, energy = requirements[index]
                 if session.connection > now or end_time <= now:
                     continue
+                if session.disconnect <= now:
+                    continue
                 remaining = max(energy - delivered[index], 0.0)
+                if remaining <= 1e-9:
+                    continue
                 vehicles.append(
                     Vehicle(
                         vehicle_id=session.session_id,
@@ -108,32 +118,47 @@ class MPCLoop:
                     )
                 )
                 active_index.append(index)
-            horizon = slots[epoch:]
-            prices = np.array(
-                [slot_price(slot, self.tariff_windows, self.timezone_name) for slot in horizon],
-                dtype=float,
-            )
+            if not vehicles:
+                epoch_costs.append(0.0)
+                epoch += 1
+                continue
+            horizon_end = max(vehicle.window_end for vehicle in vehicles)
+            horizon = [slot for slot in slots[epoch:] if slot < horizon_end]
+            if not horizon:
+                epoch_costs.append(0.0)
+                epoch += 1
+                continue
+            prices = prices_all[epoch : epoch + len(horizon)]
             state = FleetState(vehicles=vehicles, running_peak_kw=running_peak, slot_minutes=self.slot_minutes)
             schedule = policy(state, horizon, prices, self.cap_kw, dt)
             assert_feasible(schedule, state, cap_kw=self.cap_kw)
             k = min(self.committed_k, len(horizon))
             for local, index in enumerate(active_index):
-                committed[index, epoch : epoch + k] = schedule.power_kw[local, :k]
-                delivered[index] += float(schedule.power_kw[local, :k].sum() * dt)
-            peak_now = float(schedule.power_kw[:, :k].sum(axis=0).max()) if k and schedule.power_kw.size else 0.0
+                commanded = np.array(schedule.power_kw[local, :k], dtype=float, copy=True)
+                session = sessions[index]
+                for j in range(k):
+                    slot = horizon[j]
+                    if not (session.connection <= slot < session.disconnect):
+                        commanded[j] = 0.0
+                committed[index, epoch : epoch + k] = commanded
+                delivered[index] += float(commanded.sum() * dt)
+            extra_cost = 0.0
+            if plant_hook is not None:
+                extra_cost = float(
+                    plant_hook(epoch, active_index, delivered, requirements, committed) or 0.0
+                )
+            peak_now = float(committed[:, epoch : epoch + k].sum(axis=0).max()) if k else 0.0
             running_peak = max(running_peak, peak_now)
+            slot_cost = float(np.sum(committed[:, epoch : epoch + k] * dt * prices_all[epoch : epoch + k]))
+            epoch_costs.append(slot_cost + extra_cost)
             if schedule.cap_duals is not None:
                 dual_log.append(
                     {
                         "epoch": now.isoformat(),
-                        "cap_duals": [float(value) for value in schedule.cap_duals[:k]],
+                        "cap_duals": [float(value) for value in np.asarray(schedule.cap_duals)[:k]],
                     }
                 )
             epoch += k
-        prices_all = np.array(
-            [slot_price(slot, self.tariff_windows, self.timezone_name) for slot in slots],
-            dtype=float,
-        )
         unmet = np.array(
             [max(requirements[index][1] - delivered[index], 0.0) for index in range(n_i)],
             dtype=float,
@@ -165,10 +190,14 @@ class MPCLoop:
             epoch_duals=dual_log,
         )
         assert_feasible(final, FleetState(final_vehicles, running_peak_kw=running_peak), cap_kw=self.cap_kw)
+        from eci.eval.invariants import assert_invariants
+
+        assert_invariants(final, sessions)
         return ReplayLog(
             policy_name=policy_name,
             tier=tier,
             schedule=final,
             running_peak_kw=running_peak,
             dual_log=dual_log,
+            epoch_costs=epoch_costs,
         )

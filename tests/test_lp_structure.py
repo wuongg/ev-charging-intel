@@ -3,9 +3,10 @@
 from datetime import datetime, timezone
 
 import numpy as np
+import pytest
 
 from eci.optimize.policies import charge_on_arrival
-from eci.optimize.solve import solve_epoch
+from eci.optimize.solve import solve_epoch, solve_epoch_fast
 from eci.optimize.state import FleetState, Vehicle
 
 
@@ -61,3 +62,13 @@ def test_charge_on_arrival_is_not_the_only_feasible_point() -> None:
     immediate = charge_on_arrival(state, slots, prices, cap_kw=2.0, dt_hours=1.0)
     optimal = solve_epoch(state, slots, prices, cap_kw=2.0, dt_hours=1.0, penalty_unmet=1000.0)
     assert immediate.costs(1000.0)[0] >= optimal.costs(1000.0)[0] - 1e-6
+
+
+def test_fast_filler_matches_lp_cost() -> None:
+    start = datetime(2019, 1, 8, 0, tzinfo=timezone.utc)
+    slots = [start.replace(hour=hour) for hour in range(4)]
+    prices = np.array([5.0, 1.0, 5.0, 1.0])
+    state = FleetState(_vehicles())
+    lp = solve_epoch(state, slots, prices, cap_kw=2.0, dt_hours=1.0, penalty_unmet=1000.0)
+    fast = solve_epoch_fast(state, slots, prices, cap_kw=2.0, dt_hours=1.0, penalty_unmet=1000.0)
+    assert fast.costs(1000.0)[0] == pytest.approx(lp.costs(1000.0)[0])

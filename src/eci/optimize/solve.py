@@ -60,3 +60,61 @@ def solve_epoch(
         status=str(result.message),
         cap_duals=cap_duals,
     )
+
+
+def solve_epoch_fast(
+    state: FleetState,
+    slot_starts: list,
+    prices: np.ndarray,
+    cap_kw: float,
+    dt_hours: float,
+    penalty_unmet: float,
+) -> Schedule:
+    """Same objective as ``solve_epoch`` without an LP call.
+
+    Slots are filled cheapest-first. On a slot, the vehicle with the fewest
+    remaining feasible slots takes power first, so a car that still has a
+    cheap slot does not consume the only slot of someone else. Unmet penalty
+    is identical across vehicles, so who is short does not change the cost
+    once the energy at each price is fixed.
+    """
+    n_t = len(slot_starts)
+    n_i = len(state.vehicles)
+    prices = np.asarray(prices, dtype=float)
+    if n_i == 0 or n_t == 0:
+        return solve_epoch(state, slot_starts, prices, cap_kw, dt_hours, penalty_unmet)
+    slot_ts = np.array([slot.timestamp() for slot in slot_starts], dtype=float)
+    feasible = np.zeros((n_i, n_t), dtype=bool)
+    need = np.zeros(n_i)
+    p_max = np.zeros(n_i)
+    for i, vehicle in enumerate(state.vehicles):
+        feasible[i] = (slot_ts >= vehicle.window_start.timestamp()) & (slot_ts < vehicle.window_end.timestamp())
+        need[i] = min(max(vehicle.energy_remaining_kwh, 0.0), max(vehicle.battery_max_kwh, 0.0))
+        p_max[i] = vehicle.p_max_kw
+    power = np.zeros((n_i, n_t))
+    for t in np.argsort(prices, kind="mergesort"):
+        candidates = [i for i in range(n_i) if feasible[i, t] and need[i] > 1e-12]
+        candidates.sort(key=lambda i: (int(feasible[i].sum()), i))
+        left = cap_kw
+        for i in candidates:
+            if left <= 1e-12 or need[i] <= 1e-12:
+                continue
+            take = min(p_max[i], need[i] / dt_hours, left)
+            if take <= 0:
+                continue
+            power[i, t] = take
+            need[i] -= take * dt_hours
+            left -= take
+        feasible[:, t] = False
+    unmet = np.maximum(need, 0.0)
+    return Schedule(
+        vehicle_ids=[vehicle.vehicle_id for vehicle in state.vehicles],
+        slot_starts=list(slot_starts),
+        power_kw=power,
+        unmet_kwh=unmet,
+        prices=prices,
+        cap_kw=cap_kw,
+        dt_hours=dt_hours,
+        status="fast",
+        cap_duals=np.zeros(n_t),
+    )

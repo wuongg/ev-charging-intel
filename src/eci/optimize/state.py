@@ -45,7 +45,7 @@ class Schedule:
     epoch_duals: list[dict] = field(default_factory=list)
 
     def costs(self, penalty_unmet: float) -> tuple[float, float, float]:
-        """Total, energy, and penalty cost. Prices are USD/kWh placeholders."""
+        """Total, energy, and penalty cost. Prices are the tariff currency per kWh."""
         energy = float(np.sum(self.power_kw * self.dt_hours * np.asarray(self.prices, dtype=float)))
         penalty = float(penalty_unmet * np.sum(self.unmet_kwh))
         return energy + penalty, energy, penalty
