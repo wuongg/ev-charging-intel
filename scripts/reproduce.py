@@ -15,7 +15,7 @@ def main() -> int:
     if not path.exists():
         print(f"missing {path}; run scripts/run_policies.py first", file=sys.stderr)
         return 1
-    frame = pl.read_csv(path, infer_schema_length=None)
+    frame = pl.read_csv(path, infer_schema_length=None).with_columns(pl.col("value").cast(pl.Float64))
     write_reproduction(frame, provenance(REPO_ROOT / "configs" / "scheduler.yaml"))
     return 0
 

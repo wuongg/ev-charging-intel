@@ -209,7 +209,7 @@ def main() -> int:
         writer = csv.DictWriter(handle, fieldnames=list(flat[0]))
         writer.writeheader()
         writer.writerows(flat)
-    frame = pl.read_csv(dest, infer_schema_length=None)
+    frame = pl.read_csv(dest, infer_schema_length=None).with_columns(pl.col("value").cast(pl.Float64))
     summary = _summary(frame)
     summary_path = REPO_ROOT / "results" / "metrics_summary.csv"
     summary.write_csv(summary_path)

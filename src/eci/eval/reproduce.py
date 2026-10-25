@@ -73,8 +73,8 @@ def reproduction_table(frame: pl.DataFrame) -> list[dict]:
                 "window": "bank_K50_calendar_2019",
                 "tariff": "sce_tou_ev_4_march_2019",
                 "notes": (
-                    "Same runs, demand charge removed from the bill. "
-                    "This is the demand-charge share of the gap."
+                    "Demand charge removed from the same bills. "
+                    "The ratio rises, so the demand charge is not the source of the gap."
                 ),
             }
         )
@@ -87,8 +87,8 @@ def reproduction_table(frame: pl.DataFrame) -> list[dict]:
                 "window": "bank_K50_calendar_2019",
                 "tariff": "sce_tou_ev_4_march_2019",
                 "notes": (
-                    "Same P3/P4 pair on sessions whose T2 deadline is no later than "
-                    "the true disconnect. Drops early departures the median over-states."
+                    "Sessions whose T2 deadline is no later than the true disconnect. "
+                    "The ratio rises. Remaining gap is energy that does not fit in the median dwell, priced at M."
                 ),
             }
         )

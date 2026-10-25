@@ -13,12 +13,17 @@ def paired_cost_test(a: np.ndarray, b: np.ndarray) -> dict:
     if left.shape != right.shape or left.size < 2:
         raise ValueError("paired test needs at least two aligned scenarios")
     diff = left - right
-    result = stats.ttest_rel(left, right, alternative="less")
-    se = float(np.std(diff, ddof=1) / np.sqrt(diff.size))
-    half = 1.96 * se
     mean = float(np.mean(diff))
+    if float(np.std(diff)) == 0.0:
+        p_value = 0.0 if mean < 0 else 1.0
+        se = 0.0
+    else:
+        result = stats.ttest_rel(left, right, alternative="less")
+        p_value = float(result.pvalue)
+        se = float(np.std(diff, ddof=1) / np.sqrt(diff.size))
+    half = 1.96 * se
     return {
-        "p_value": float(result.pvalue),
+        "p_value": p_value,
         "mean_diff": mean,
         "ci_low": mean - half,
         "ci_high": mean + half,
