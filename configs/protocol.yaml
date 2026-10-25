@@ -1,4 +1,14 @@
-# Pre-registration skeleton. Freeze before the K=50 runs. Do not record results here.
 primary_comparison: null
-bh_fdr_q: 0.10
+bh_fdr_q: 0.1
 seeds: []
+bank_hash: 7484043270ba761c133346447998fee64d0bb254b84d30befebcd15365ac1c32
+regime:
+  start: '2019-01-01'
+  end: '2020-01-01'
+  amendment: Day-2 Kaggle mirror ended 2018-11-13, so the pre-registered 2019-06 window
+    had 0 origins. Path B1 extends the span through 2020. The bank uses calendar 2019,
+    the first full pre-COVID year inside that span.
+frozen:
+  embargo_hours: 336
+  penalty_unmet: 1000.0
+  committed_k: 1

@@ -1,6 +1,7 @@
 # EV Fleet Charging Intelligence
 # Day 1 live targets: install, data, audit, test.
-# Day 2: forecast runs the full stack. scenarios/optimize/evaluate stay stubs.
+# Day 2: forecast runs the full stack.
+# Day 3: scenarios builds the K=50 bank. optimize runs P0 versus P3.
 
 ifeq ($(OS),Windows_NT)
 SHELL := cmd.exe
