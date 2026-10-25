@@ -1,0 +1,14 @@
+{
+  "date": "2019-01-15",
+  "timezone": "America/Los_Angeles",
+  "currency": "USD",
+  "tariff": "sce_ev4_placeholder",
+  "note": "Locks the PLACEHOLDER SCE schedule. A real EV-4 sheet replaces both the YAML and this file together.",
+  "prices_per_kwh": [
+    0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+    0.2, 0.2, 0.2, 0.2,
+    0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+    0.2, 0.2, 0.2,
+    0.1, 0.1, 0.1
+  ]
+}

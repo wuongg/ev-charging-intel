@@ -1,0 +1,4 @@
+# Pre-registration skeleton. Freeze before the K=50 runs. Do not record results here.
+primary_comparison: null
+bh_fdr_q: 0.10
+seeds: []

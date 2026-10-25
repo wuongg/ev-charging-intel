@@ -1,0 +1,33 @@
+# Decision 963/2026 structure from the day-1 brief.
+# Peak 17:30–22:30 Monday–Saturday (T2–T7). Sunday has no peak.
+# Off-peak 00:00–06:00. Everything else is normal.
+# TODO verify QĐ 963 — price_per_kwh values are PLACEHOLDERS, not the decision's VND/kWh.
+timezone: Asia/Ho_Chi_Minh
+currency: VND
+rate_status: placeholder
+windows:
+  - name: off_peak
+    start: "00:00"
+    end: "06:00"
+    days: [mon, tue, wed, thu, fri, sat, sun]
+    price_per_kwh: 1000  # PLACEHOLDER — TODO verify QĐ 963
+  - name: normal
+    start: "06:00"
+    end: "17:30"
+    days: [mon, tue, wed, thu, fri, sat]
+    price_per_kwh: 2000  # PLACEHOLDER — TODO verify QĐ 963
+  - name: peak
+    start: "17:30"
+    end: "22:30"
+    days: [mon, tue, wed, thu, fri, sat]  # T2–T7; Sunday is not a peak day
+    price_per_kwh: 3000  # PLACEHOLDER — TODO verify QĐ 963
+  - name: normal
+    start: "22:30"
+    end: "24:00"
+    days: [mon, tue, wed, thu, fri, sat]
+    price_per_kwh: 2000  # PLACEHOLDER — TODO verify QĐ 963
+  - name: normal
+    start: "06:00"
+    end: "24:00"
+    days: [sun]  # CN: no peak
+    price_per_kwh: 2000  # PLACEHOLDER — TODO verify QĐ 963

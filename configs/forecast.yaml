@@ -1,0 +1,6 @@
+# Design parameters. Not fitted on day 1.
+quantiles: [0.1, 0.5, 0.9]
+seasonal_period_hours: 168
+residual_window_days: 28
+# Set to the max session duration when the backtest is built.
+embargo_hours: null

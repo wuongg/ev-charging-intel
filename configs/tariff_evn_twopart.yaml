@@ -1,0 +1,9 @@
+# Regime D capacity charge, as named in the design doc.
+# TODO verify 209459–286153 VND/kW/month against the source decision before any bill is computed.
+# Energy windows live in tariff_evn_2026.yaml and are not repeated here.
+timezone: Asia/Ho_Chi_Minh
+currency: VND
+rate_status: placeholder
+capacity_charge_vnd_per_kw_month:
+  low: 209459  # TODO verify
+  high: 286153  # TODO verify

@@ -1,0 +1,5 @@
+slot_minutes: 15
+# TODO: penalty M, epsilon_peak, and committed_k when the LP is formulated.
+penalty_unmet: null
+epsilon_peak: null
+committed_k: null

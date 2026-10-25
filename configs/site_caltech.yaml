@@ -1,0 +1,8 @@
+site: caltech
+evse_count: 54
+dcfc_count: 1
+dcfc_power_kw: 50
+site_cap_kw: 150
+timezone: America/Los_Angeles
+# TODO: per-EVSE amp split from pilot signals. 6.7 kW is a PLACEHOLDER, not a measured nameplate.
+evse_power_default_kw: 6.7

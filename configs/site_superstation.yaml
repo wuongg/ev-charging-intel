@@ -1,0 +1,5 @@
+# S5 from the design doc: 1,038-port VN scenario. Cap and port power are not set.
+site: superstation
+evse_count: 1038
+timezone: Asia/Ho_Chi_Minh
+# TODO: site cap, per-port power, and which tariff binds S5

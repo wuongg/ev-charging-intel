@@ -1,0 +1,4 @@
+# Scenario-bank spec from the design doc. The bank itself is not built on day 1.
+k: 50
+utilization_grid: [1, 2, 4, 8]
+# TODO: dwell grid, congestion arms, VN axes S1–S5
