@@ -1,6 +1,6 @@
 # EV Fleet Charging Intelligence
 # Day 1 live targets: install, data, audit, test.
-# Every other target exits 0 and prints "not implemented yet (week N)".
+# Day 2: forecast runs the full stack. scenarios/optimize/evaluate stay stubs.
 
 ifeq ($(OS),Windows_NT)
 SHELL := cmd.exe
