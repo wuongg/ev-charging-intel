@@ -73,5 +73,11 @@ plant_semantics:
   amended_at: '2026-10-25T14:43:53Z'
   invariant: I9
   text: The plant delivers on the physical plug only. A believed deadline is
-    a policy input. Days 4 and 5 dropped the car when that belief expired, so
+    a policy input.     Days 4 and 5 dropped the car when that belief expired, so
     their unmet and penalty numbers are superseded by this amendment.
+day6_predictions:
+  written_at: '2026-10-25T14:46:00Z'
+  text: Six pre-registered bands in results/day6_predictions.csv. Written
+    before the corrected bank runs. Three matched. The misses are P4 ToU
+    on the total bill, the magnitude of the P3 versus P0 reduction, and
+    reproduction v3 still above 15 percent.

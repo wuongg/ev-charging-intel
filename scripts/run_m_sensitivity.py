@@ -8,7 +8,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import polars as pl
 
 from eci.config import REPO_ROOT, provenance
-from eci.eval.sweep import M_GRID, m_sensitivity_scenario
+from eci.eval.sweep import m_sensitivity_scenario
 
 
 def _aggregate(rows: list[dict]) -> pl.DataFrame:
@@ -63,10 +63,11 @@ def main() -> int:
         diagnosis_path = REPO_ROOT / "results" / "t2v2_diagnosis.csv"
         diagnosis.write_csv(diagnosis_path)
         print(f"unmet_p3={unmet_p3:.4f} wrote {diagnosis_path}")
-    for penalty in M_GRID:
-        block = summary.filter(pl.col("M") == penalty)
-        print(f"M={penalty}")
-        print(block.select(["policy", "mean_reduction_vs_p0", "penalty_share_of_bill", "mean_unmet_rate"]))
+    for row in summary.iter_rows(named=True):
+        print(
+            f"M={row['M']} {row['policy']} red={row['mean_reduction_vs_p0']:.4f} "
+            f"share={row['penalty_share_of_bill']:.3f} unmet={row['mean_unmet_rate']:.4f}"
+        )
     print(f"wrote {dest}")
     return 0
 

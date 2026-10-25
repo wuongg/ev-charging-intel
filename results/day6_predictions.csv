@@ -1,7 +1,7 @@
 metric,predicted,band_low,band_high,actual,match,note,predicted_at
-p0_unmet_sce,0.005,0.002,0.01,,,P0 unmet on the frozen bank after the plant fix. Band is the pre-registered 0.2 to 1 percent. A one-scenario gate only checked the 2 percent stop rule and was not used to set this number.,2026-10-25T14:46:00Z
-p3_unmet_sce,0.04,0.005,0.10,,,P3 unmet is the energy the LP places after the true disconnect of late beliefs. A few percent. Not the Day-5 23 percent.,2026-10-25T14:46:00Z
-p4_reduction_vs_p0_sce_m25,0.175,0.10,0.25,,,(cost P0 minus cost P4) / cost P0 on SCE at M=25. Pre-registered time-of-use band 10 to 25 percent.,2026-10-25T14:46:00Z
-p3_vs_p1_gap_cap150_util1,0.0,-0.01,0.01,,,"(cost P1 minus cost P3) / cost P1 at 150 kW and 1x arrivals. The cap still does not bind.",2026-10-25T14:46:00Z
-p3_reduction_vs_p0_sce_m25,-0.15,-1.0,0.0,,,Sign prediction: a few percent unmet priced at 25 USD/kWh costs more than the time-of-use saving, so P3 stays more expensive than P0. Match if the reduction is negative or zero.,2026-10-25T14:46:00Z
-reproduction_v3_gap,0.092,0.01,0.15,,,"(cost P3 minus cost P4) / cost P4 on the declared-departure bank. Band is 1 to 15 percent, around the published 9.2 percent.",2026-10-25T14:46:00Z
+p0_unmet_sce,0.005,0.002,0.01,0.00364361130162,true,P0 unmet on the frozen bank after the plant fix. Band is the pre-registered 0.2 to 1 percent. A one-scenario gate only checked the 2 percent stop rule and was not used to set this number.,2026-10-25T14:46:00Z
+p3_unmet_sce,0.04,0.005,0.10,0.0479986601009,true,P3 unmet is the energy the LP places after the true disconnect of late beliefs. A few percent. Not the Day-5 23 percent.,2026-10-25T14:46:00Z
+p4_reduction_vs_p0_sce_m25,0.175,0.10,0.25,0.0140195623383,false,(cost P0 minus cost P4) / cost P0 on SCE at M=25. Pre-registered time-of-use band 10 to 25 percent.,2026-10-25T14:46:00Z
+p3_vs_p1_gap_cap150_util1,0.0,-0.01,0.01,0,true,(cost P1 minus cost P3) / cost P1 at 150 kW and 1x arrivals. The cap still does not bind.,2026-10-25T14:46:00Z
+p3_reduction_vs_p0_sce_m25,-0.15,-1.0,0.0,-2.82915165007,false,Sign prediction: a few percent unmet priced at 25 USD/kWh costs more than the time-of-use saving so P3 stays more expensive than P0. Match if the reduction is negative or zero.,2026-10-25T14:46:00Z
+reproduction_v3_gap,0.092,0.01,0.15,1.3473562891,false,(cost P3 minus cost P4) / cost P4 on the declared-departure bank. Band is 1 to 15 percent around the published 9.2 percent.,2026-10-25T14:46:00Z
