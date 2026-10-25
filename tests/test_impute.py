@@ -56,6 +56,24 @@ def test_declared_departure_is_not_replaced() -> None:
     assert sampler.apply([session])[0].requested_departure == declared
 
 
+def test_same_tau_gives_the_same_deadline() -> None:
+    sampler = _sampler()
+    session = ScenarioSession(
+        session_id="ev-7",
+        connection=datetime(2019, 1, 8, 16, tzinfo=timezone.utc),
+        disconnect=datetime(2019, 1, 8, 22, tzinfo=timezone.utc),
+        kwh=8.0,
+        p_max_kw=6.6,
+        station_id="A",
+    )
+    first = sampler.apply_quantile([session], 0.75)[0].requested_departure
+    second = sampler.apply_quantile([session], 0.75)[0].requested_departure
+    low = sampler.apply_quantile([session], 0.25)[0].requested_departure
+    assert first == second
+    assert first is not None and low is not None
+    assert low <= first
+
+
 def test_quantile_is_inside_the_sample() -> None:
     sampler = _sampler()
     pool = sampler.pool("A", 8)

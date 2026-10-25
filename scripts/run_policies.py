@@ -173,6 +173,10 @@ def main() -> int:
         from run_cap_sweep import main as run_cap
 
         return run_cap()
+    if "--risk-dial" in sys.argv:
+        from run_risk_dial import main as run_dial
+
+        return run_dial()
     bank_path = REPO_ROOT / "scenarios" / "bank_K50.parquet"
     if not bank_path.exists():
         print(f"missing {bank_path}", file=sys.stderr)

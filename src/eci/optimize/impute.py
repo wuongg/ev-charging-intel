@@ -57,6 +57,24 @@ class DwellSampler:
     def sample_hours(self, session_id: str, station: str, hour: int) -> float:
         return empirical_quantile(self.pool(station, hour), unit_interval(session_id))
 
+    def quantile_hours(self, session: ScenarioSession, tau: float) -> float:
+        """Station-hour dwell quantile. The same tau always returns the same hours."""
+        if not 0.0 < tau < 1.0:
+            raise ValueError(f"tau must be in (0, 1), got {tau}")
+        local = session.connection.astimezone(LA)
+        return empirical_quantile(self.pool(session.station_id, local.hour), tau)
+
+    def apply_quantile(self, sessions: list[ScenarioSession], tau: float) -> list[ScenarioSession]:
+        """Replace a missing deadline with the stratum quantile. A declared one stays."""
+        out: list[ScenarioSession] = []
+        for session in sessions:
+            if session.requested_departure is not None:
+                out.append(session)
+                continue
+            hours = self.quantile_hours(session, tau)
+            out.append(replace(session, requested_departure=session.connection + timedelta(hours=hours)))
+        return out
+
     def apply(self, sessions: list[ScenarioSession]) -> list[ScenarioSession]:
         """Fill a missing requested departure. A declared one is left as it is."""
         out: list[ScenarioSession] = []

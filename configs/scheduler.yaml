@@ -9,6 +9,10 @@ slot_minutes: 15
 # The headline is not chosen to make P3 beat P1.
 penalty_unmet: 1000.0
 penalty_unmet_headline: 25.0
+# null keeps the T2v2 per-session draw. The risk dial sweeps the grid below
+# and does not change the default used by the bank runs.
+deadline_quantile: null
+deadline_quantile_grid: [0.25, 0.5, 0.75, 0.9]
 epsilon_peak: null
 committed_k: 1
 nominal_volts: 208
