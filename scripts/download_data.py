@@ -2,6 +2,7 @@
 
 Path A uses ACN_DATA_TOKEN against the Caltech API.
 Path B (default today) is the public Kaggle mirror and tolerates the truncated tail.
+Path B1 (--source static) sparse-checkouts the ACN-Data-Static garage time series.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ import argparse
 import gzip
 import logging
 import os
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +27,60 @@ LOGGER = logging.getLogger(__name__)
 
 ACN_START = "2018-09-01"
 ACN_END = "2021-12-31"
+STATIC_REPO = "https://github.com/tongxin-li/ACN-Data-Static.git"
+STATIC_PATHS = (
+    "time series data/caltech/California_Garage_01",
+    "time series data/jpl/Arroyo_Garage_01",
+)
+
+
+def download_static_snapshot(raw_dir: Path) -> int:
+    """Sparse-checkout the two main garages. Skip the clone when files are already there.
+
+    If the two-garage checkout fails, fall back to California_Garage_01 and say so.
+    """
+    dest = raw_dir / "acn_static_repo"
+    caltech = dest / "time series data" / "caltech" / "California_Garage_01"
+    jpl = dest / "time series data" / "jpl" / "Arroyo_Garage_01"
+    if caltech.exists() and any(caltech.glob("*.csv.gz")):
+        jpl_n = sum(1 for _ in jpl.glob("*.csv.gz")) if jpl.exists() else 0
+        caltech_n = sum(1 for _ in caltech.glob("*.csv.gz"))
+        if jpl_n == 0:
+            print("b1_coverage=California_Garage_01 only; JPL was not in the checkout")
+        print(f"static_already_present caltech={caltech_n} jpl={jpl_n}")
+        return 0
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if not (dest / ".git").exists():
+        subprocess.run(
+            [
+                "git",
+                "clone",
+                "--filter=blob:none",
+                "--sparse",
+                "--depth",
+                "1",
+                STATIC_REPO,
+                str(dest),
+            ],
+            check=True,
+        )
+    try:
+        subprocess.run(["git", "sparse-checkout", "set", *STATIC_PATHS], cwd=dest, check=True)
+    except subprocess.CalledProcessError:
+        LOGGER.warning("two-garage sparse-checkout failed; keeping California_Garage_01 only")
+        subprocess.run(
+            ["git", "sparse-checkout", "set", STATIC_PATHS[0]],
+            cwd=dest,
+            check=True,
+        )
+        print("b1_coverage=California_Garage_01 only; JPL checkout failed")
+    caltech_n = sum(1 for _ in caltech.glob("*.csv.gz")) if caltech.exists() else 0
+    jpl_n = sum(1 for _ in jpl.glob("*.csv.gz")) if jpl.exists() else 0
+    print(f"static_files caltech={caltech_n} jpl={jpl_n}")
+    if caltech_n <= 0:
+        LOGGER.error("static snapshot recovered 0 California sessions")
+        return 1
+    return 0
 
 
 def _download_acn(site: str, token: str, raw_dir: Path) -> dict:
@@ -55,11 +111,13 @@ def _download_acn(site: str, token: str, raw_dir: Path) -> dict:
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description="Mirror ACN sessions and optional KBUR weather")
-    parser.add_argument("--source", choices=["auto", "kaggle", "acn"], default="auto")
+    parser.add_argument("--source", choices=["auto", "kaggle", "acn", "static"], default="auto")
     parser.add_argument("--site", default="caltech")
     args = parser.parse_args(argv)
 
     raw_dir = REPO_ROOT / "data" / "raw"
+    if args.source == "static":
+        return download_static_snapshot(raw_dir)
     token = os.environ.get("ACN_DATA_TOKEN", "").strip()
     source = args.source
     if source == "auto":

@@ -1,4 +1,14 @@
 files:
+- file: data/raw/acn_static_snapshot.txt
+  sha256: 584f57adb5caa9d19d67210036b83d543aad1f3be4e0c8074e4e319c1ad36d0d
+  source_url: https://github.com/tongxin-li/ACN-Data-Static
+  downloaded_at: '2026-10-25T10:26:52Z'
+  rows_recovered: 59576
+  truncated: false
+  git_commit: abb7cf15cc7108913e965d4375cc7270d532b65f
+  garages:
+  - caltech/California_Garage_01
+  - jpl/Arroyo_Garage_01
 - file: data/raw/acndata_sessions.json
   sha256: 035ad2bd697825935aef756babfbc661f261c52d601af02e799f90d50db91ff3
   source_url: https://www.kaggle.com/api/v1/datasets/download/dextersebs/ev-dataset
@@ -10,4 +20,10 @@ files:
   source_url: https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py
   downloaded_at: '2026-10-25T09:15:42Z'
   rows_recovered: 38969
+  truncated: false
+- file: scenarios/bank_K50.parquet
+  sha256: 7484043270ba761c133346447998fee64d0bb254b84d30befebcd15365ac1c32
+  source_url: day-block bootstrap of data/interim/sessions.parquet
+  downloaded_at: '2026-10-25T10:28:37Z'
+  rows_recovered: 565609
   truncated: false

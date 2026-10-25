@@ -106,10 +106,25 @@ def measure_stats(df: pl.DataFrame) -> dict:
         if hour is not None
     }
     peak = int(hour_frame["hour"][0]) if hour_frame.height else None
+    n_done = 0
+    clock_done = 0
+    if "doneChargingTime_utc" in df.columns:
+        done_rows = df.filter(pl.col("doneChargingTime_utc").is_not_null())
+        n_done = done_rows.height
+        if n_done and F_CLOCK_SKEW in done_rows.columns:
+            clock_done = int(done_rows.filter(pl.col(F_CLOCK_SKEW)).height)
+    rate_all = clock / n
+    rate_done = (clock_done / n_done) if n_done else rate_all
+    # B1 time series have no doneChargingTime. The clock-skew defect only exists
+    # on API rows, so the gate uses that subset once it is large enough.
+    gate_rate = rate_done if n_done >= 100 else rate_all
     return {
         "n": n,
         "clock_skew_count": clock,
-        "clock_skew_rate": clock / n,
+        "clock_skew_rate": gate_rate,
+        "clock_skew_rate_all": rate_all,
+        "clock_skew_rate_with_done": rate_done,
+        "clock_skew_n_with_done": n_done,
         "long_dwell_flag_count": long_flag,
         "long_dwell_flag_rate": long_flag / n,
         "long_dwell_24h_count": long_24,

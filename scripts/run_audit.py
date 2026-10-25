@@ -41,19 +41,70 @@ def _write_parquet(frame, dest: Path, prov: dict) -> None:
     pq.write_table(table, dest)
 
 
+def _merge_static(sessions: list[dict]) -> list[dict]:
+    """Fold path B1 into the API mirror when the sparse checkout is on disk."""
+    import subprocess
+
+    from eci.data.ingest_static import list_garages, merge_session_records, parse_static_repo
+    from eci.data.manifest import sha256_file, write_manifest_entry
+
+    root = REPO_ROOT / "data" / "raw" / "acn_static_repo"
+    garages = list_garages(root)
+    print("b1_garages=" + (",".join(garages) if garages else "none"))
+    if not garages:
+        return sessions
+    if "jpl/Arroyo_Garage_01" not in garages:
+        print("b1_coverage=California_Garage_01 only; JPL was not in the checkout")
+    static_records = parse_static_repo(root, REPO_ROOT / "data" / "interim" / "profiles")
+    merged, stats = merge_session_records(sessions, static_records)
+    for key, value in stats.items():
+        print(f"{key}={value}")
+    try:
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=root, text=True, stderr=subprocess.DEVNULL
+        ).strip()
+    except (subprocess.CalledProcessError, OSError):
+        commit = "unknown"
+    stamp = REPO_ROOT / "data" / "raw" / "acn_static_snapshot.txt"
+    stamp.write_text(
+        f"git_commit={commit}\ngarages={','.join(garages)}\nsessions={len(static_records)}\n",
+        encoding="utf-8",
+    )
+    from datetime import datetime, timezone
+
+    write_manifest_entry(
+        {
+            "file": "data/raw/acn_static_snapshot.txt",
+            "sha256": sha256_file(stamp),
+            "source_url": "https://github.com/tongxin-li/ACN-Data-Static",
+            "downloaded_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "rows_recovered": len(static_records),
+            "truncated": False,
+            "git_commit": commit,
+            "garages": garages,
+        }
+    )
+    return merged
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    site_cfg = REPO_ROOT / "configs" / "site_caltech.yaml"
-    prov = provenance(site_cfg)
     from eci.config import load_config
 
+    site_cfg = REPO_ROOT / "configs" / "site_caltech.yaml"
     timezone_name = load_config(site_cfg).model_dump().get("timezone") or "America/Los_Angeles"
     mirror = _mirror_path()
     sessions, truncated = load_session_mirror(mirror)
-    print(f"sessions_recovered={len(sessions)}")
+    print(f"sessions_before_b1={len(sessions)}")
     print(f"truncated={truncated}")
+    sessions = _merge_static(sessions)
+    print(f"sessions_after_merge={len(sessions)}")
+    prov = provenance(site_cfg)
     parsed = parse_sessions(sessions, timezone_name=timezone_name)
     cleaned, funnel = clean_sessions(parsed, timezone_name=timezone_name)
+    from eci.data.ingest_static import attach_b1_columns
+
+    cleaned = attach_b1_columns(cleaned)
     report_path = REPO_ROOT / "results" / "audit_report.html"
     report = audit_gate(cleaned, funnel, report_path=report_path, provenance_info=prov)
     parquet_path = REPO_ROOT / "data" / "interim" / "sessions.parquet"
@@ -63,10 +114,12 @@ def main() -> int:
 
     print(f"quality_score={report.quality_score:.6f}")
     print(f"clock_skew_count={report.clock_skew_count}")
-    print(f"clock_skew_rate={report.clock_skew_rate:.4%}")
+    stats = report.stats
+    print(f"clock_skew_rate_with_done={stats.get('clock_skew_rate_with_done', 0):.4%}")
+    print(f"clock_skew_n_with_done={stats.get('clock_skew_n_with_done', 0)}")
+    print(f"clock_skew_rate_all={stats.get('clock_skew_rate_all', 0):.4%}")
     print(f"arrival_peak_local_hour={report.peak_hour}")
     print(f"gate={'PASS' if report.passed else 'FAIL'}")
-    stats = report.stats
     print(f"long_dwell_24h_count={stats['long_dwell_24h_count']}")
     print(f"long_dwell_24h_rate={stats['long_dwell_24h_rate']:.4%}")
     print(f"long_dwell_48h_flag_count={stats['long_dwell_flag_count']}")
@@ -78,6 +131,13 @@ def main() -> int:
     )
     print(f"kwh_zero_count={stats['kwh_zero_count']}")
     print(f"kwh_zero_rate={stats['kwh_zero_rate']:.4%}")
+    start = cleaned["connectionTime_utc"].min()
+    end = cleaned["disconnectTime_utc"].max()
+    months = 0.0 if start is None or end is None else (end - start).total_seconds() / (86400.0 * 30.437)
+    print(f"span_start={start}")
+    print(f"span_end={end}")
+    print(f"span_months={months:.2f}")
+    print(f"n_sessions={cleaned.height}")
     print("funnel")
     for row in funnel.to_dicts():
         print(
