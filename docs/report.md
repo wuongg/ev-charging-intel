@@ -37,3 +37,11 @@ v1 gap 29.1837; v3 gap 1.3474; v4 gap 2.4933.
 M sweep T2C: 10 → 1.0829; 25 → 2.4933; 100 → 7.0447.
 
 Source files: `results/metrics_v4_summary.csv`, `results/voi_summary.csv`, `results/voi_corrected_summary.csv`, `results/reproduction.csv`, `results/reproduction_v4.csv`, `results/t2c_dial.csv`, `results/cap_sweep_tests.csv`, `results/day6_predictions.csv`, `results/day7_predictions.csv`, `results/t2v2_diagnosis.csv`.
+
+## Day 9 findings
+
+- **Dwell × tariff.** On energy cost, charging intelligence pays when median dwell ≥ 5.2 h at spread factor 1 — below 2.6 h the right lever is compliance/capacity, not scheduling. The total bill stays penalty-dominated. Scenario analysis. Trace: `results/dwell_tariff_map.csv`.
+- **Sobol.** dwell_scale total-order index 0.91; dwell 0.91. The scheduler's marginal value is conditional on dwell_scale. Scenario analysis. Trace: `results/sobol_indices.csv`.
+- **Capacity dual.** Shadow price at binding hours ≈ $0.006/kW-epoch (ε=0.01, one day). Trace: `results/dlmp_summary.csv`.
+- **Drift.** PSI trips months before the known COVID regime break (9 pre-shift fires vs a frozen reference year; `acn_2018_2020_proxy`) — raw PSI is noisy; the actionable alarm is the relative pinball ratio, which fires exactly at 2020-03-29 and drives a refit that cuts pinball 56.8 → 18.3 (−67.8%). Detector design: relative-SLI triggers, absolute metrics only for dashboards. The same detector that triggers forecast retrain is the data-drift-detection-triggering-retraining pattern a VinDynamics JD asks for. Trace: `results/drift_twente.csv`, `results/retrain_demo.csv`.
+- **VN outage (S1, assumed).** Under simulated unannounced VN-pattern outages, the scheduler absorbs 66% of at-risk energy via next-epoch re-solve and holds I1 (peak 112.9 kW); P3 unmet equals P0 — the binding constraint is the plug clock, not the schedule; the irrecoverable loss is exactly the deadlines that fall inside the outage window (bounded, measured, not denied). Trace: `results/vn_outage_demo.csv`.
