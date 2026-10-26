@@ -1,0 +1,2 @@
+before_trigger_pinball,after_refit_pinball,improvement_pct,trigger_day,n_score_days,source,note,git_sha,config_hash,data_hash,utc_now
+56.83628739009435,18.323322913477824,67.76122481801778,2020-03-29,337,acn_2018_2020_proxy,pinball tau=0.5; trigger = model/baseline > 1 for 14 consecutive days,600576a35ecdbaf872a73c02dba6c05d518399c4-dirty,43bed089a2cd2fd1e221418def652bc23cde9daed36abe250872900027ab6a7c,3bca5d4970f1e47224c42b10f19116f84161cec7637a7ca615c538022bf420c2,2026-10-26T09:07:50Z

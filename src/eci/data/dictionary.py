@@ -86,6 +86,13 @@ def build_data_dictionary(
             "- Per-EVSE amp split. `evse_power_default_kw: 6.7` is a placeholder.",
             "- NOAA/IEM ASOS weather license before redistribution.",
             "",
+            "## Third-party datasets (not redistributed)",
+            "",
+            "- Twente / a.s.r. office-parking sessions (DOI 10.4121/80ef3824-3f5d-4e45-8794-3b8791efbd13): "
+            "**CC BY-NC-SA 4.0**. Drift-demo only. Do not commit or redistribute `data/raw/twente/`. "
+            "If 4TU is unreachable the drift demo falls back to the existing ACN 2018–2020 mirror "
+            "and labels `results/drift_twente.csv` as a proxy.",
+            "",
         ]
     )
     dest.parent.mkdir(parents=True, exist_ok=True)

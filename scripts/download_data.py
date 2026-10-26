@@ -19,7 +19,7 @@ from pathlib import Path
 import orjson
 
 from eci.config import REPO_ROOT
-from eci.data.download import download_kaggle_mirror, download_weather
+from eci.data.download import download_kaggle_mirror, download_twente, download_weather
 from eci.data.ingest import fetch_acn_site
 from eci.data.manifest import sha256_file, write_manifest_entry
 
@@ -111,11 +111,20 @@ def _download_acn(site: str, token: str, raw_dir: Path) -> dict:
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description="Mirror ACN sessions and optional KBUR weather")
-    parser.add_argument("--source", choices=["auto", "kaggle", "acn", "static"], default="auto")
+    parser.add_argument("--source", choices=["auto", "kaggle", "acn", "static", "twente"], default="auto")
     parser.add_argument("--site", default="caltech")
     args = parser.parse_args(argv)
 
     raw_dir = REPO_ROOT / "data" / "raw"
+    if args.source == "twente":
+        entry = download_twente(raw_dir)
+        if entry is None:
+            LOGGER.error("Twente download failed (CC BY-NC-SA). Drift demo will use the ACN 2018-vs-2020 proxy.")
+            return 1
+        write_manifest_entry(entry)
+        print("license=CC BY-NC-SA 4.0 demo-only not-redistributed")
+        print(f"file={entry['file']}")
+        return 0
     if args.source == "static":
         return download_static_snapshot(raw_dir)
     token = os.environ.get("ACN_DATA_TOKEN", "").strip()

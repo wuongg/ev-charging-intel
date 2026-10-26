@@ -537,5 +537,43 @@ def main() -> int:
     return 0
 
 
+def retrain_trigger_demo(
+    hourly: pl.DataFrame | None = None,
+    *,
+    train_end=None,
+    score_end=None,
+    source: str = "acn_2018_2020_proxy",
+) -> dict:
+    """Champion LightGBM on the reference years; refit when pinball ratio > 1 for 14 days."""
+    from datetime import date
+
+    from eci.data.features import build_hourly_demand
+    from eci.eval.drift import run_retrain_demo
+
+    if hourly is None:
+        sessions = pl.read_parquet(REPO_ROOT / "data" / "interim" / "sessions.parquet")
+        hourly = build_hourly_demand(sessions, "caltech")
+    row = run_retrain_demo(
+        hourly,
+        train_end=train_end or date(2019, 12, 31),
+        score_end=score_end,
+        source=source,
+    )
+    dest = REPO_ROOT / "results" / "retrain_demo.csv"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with dest.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(row.keys()))
+        writer.writeheader()
+        writer.writerow(row)
+    print(
+        f"retrain trigger_day={row['trigger_day'] or 'none'} "
+        f"before={row['before_trigger_pinball']:.4g} after={row['after_refit_pinball']:.4g} "
+        f"improvement={row['improvement_pct']:.2f}%"
+    )
+    return row
+
+
 if __name__ == "__main__":
+    if "--retrain-demo" in sys.argv:
+        sys.exit(0 if retrain_trigger_demo() else 1)
     sys.exit(main())

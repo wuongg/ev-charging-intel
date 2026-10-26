@@ -14,6 +14,10 @@ from eci.data.manifest import sha256_file
 
 LOGGER = logging.getLogger(__name__)
 
+TWENTE_PAGE = "https://data.4tu.nl/datasets/80ef3824-3f5d-4e45-8794-3b8791efbd13/1"
+TWENTE_API = "https://data.4tu.nl/v2/articles?search_for=80ef3824-3f5d-4e45-8794-3b8791efbd13"
+TWENTE_LICENSE = "CC BY-NC-SA 4.0"
+
 KAGGLE_URL = "https://www.kaggle.com/api/v1/datasets/download/dextersebs/ev-dataset"
 IEM_ASOS_URL = "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py"
 USER_AGENT = "eci-day1"
@@ -119,4 +123,63 @@ def download_weather(raw_dir: Path) -> dict | None:
         "downloaded_at": _now(),
         "rows_recovered": rows,
         "truncated": False,
+    }
+
+
+def download_twente(raw_dir: Path, timeout: int = 20) -> dict | None:
+    """Fetch the a.s.r. office-parking workbook from 4TU. NC license; demo only.
+
+    Returns None when 4TU is unreachable. The drift demo then uses the ACN
+    2018-vs-2020 proxy and labels the CSV as a fallback.
+    """
+    dest_dir = Path(raw_dir) / "twente"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    marker = dest_dir / "LICENSE_CC_BY-NC-SA.txt"
+    marker.write_text(
+        "CC BY-NC-SA 4.0. University of Twente / a.s.r. living lab. "
+        "DOI 10.4121/80ef3824-3f5d-4e45-8794-3b8791efbd13. "
+        "Do not redistribute. Drift-demo use only.\n",
+        encoding="utf-8",
+    )
+    try:
+        response = requests.get(
+            TWENTE_API,
+            timeout=timeout,
+            headers={"User-Agent": USER_AGENT},
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except (requests.RequestException, ValueError) as exc:
+        LOGGER.warning("Twente 4TU listing failed (%s); not redistributing anything", exc)
+        return None
+    articles = payload if isinstance(payload, list) else [payload]
+    files = []
+    for article in articles:
+        files.extend(article.get("files") or [])
+    if not files:
+        LOGGER.warning("Twente 4TU listing had no files")
+        return None
+    saved = 0
+    for item in files:
+        url = item.get("download_url") or item.get("url")
+        name = item.get("name") or f"twente_{saved}"
+        if not url:
+            continue
+        target = dest_dir / Path(str(name)).name
+        try:
+            _stream_to(url, target)
+            saved += 1
+        except requests.RequestException as exc:
+            LOGGER.warning("Twente file %s failed: %s", name, exc)
+    if saved <= 0:
+        return None
+    return {
+        "file": "data/raw/twente/",
+        "sha256": sha256_file(marker),
+        "source_url": TWENTE_PAGE,
+        "downloaded_at": _now(),
+        "rows_recovered": saved,
+        "truncated": False,
+        "license": TWENTE_LICENSE,
+        "redistribute": False,
     }
