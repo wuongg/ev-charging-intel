@@ -77,3 +77,7 @@ Outcomes are in `results/voi_corrected_summary.csv`, `results/reproduction_v4.cs
 ## Day 8 scenario analysis (amendment after `v0.7-week1-frozen`)
 
 The dwell × tariff map, Sobol indices, and ε-peak front scale dwell, tariff spread, utilization, and M on the frozen bank. Actual disconnect and believed deadline are scaled together. These runs are labeled scenario analysis in the CSV `note` column. They are not measurements of Caltech 2019. β default, M headline, k, and the embargo stay frozen. Interpretation of the Day-7 β grid is ADR-004.
+
+## Day 9 apply-ready (amendment after `v0.7-week1-frozen`)
+
+Twente / a.s.r. (CC BY-NC-SA 4.0, DOI 10.4121/80ef3824-3f5d-4e45-8794-3b8791efbd13) is demo-only and is not redistributed. When 4TU is unreachable the drift demo uses the existing ACN 2018–2020 mirror as a labeled COVID-regime proxy (`source=acn_2018_2020_proxy` in `results/drift_twente.csv`). PSI bins are frozen on the reference year; ε-floor is 1e-4. VN S1 outage probabilities are assumed, not measured. v0.7 is not rewritten.
