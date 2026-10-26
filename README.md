@@ -34,6 +34,9 @@ M-rescore of the same T2C power: 108.3% at M=10, 249.3% at M=25, 704.5% at M=100
 - **Risk knob.** Safety here is assuming little time. T2C unmet at β=0.25 / 0.5 / 0.75 is 3.2% / 7.9% / 15.5%. A longer belief lets cheapest-slot wait after the car has left.
 - **Negative result.** P3 matches P1 whenever 150 kW does not bind. Tightest cell 60 kW ×4: LP cheaper than greedy by 12247 (p=6.4e-15). No cell in the grid saves 1% versus greedy as a break-even cap.
 - **Plant semantics.** Before I9, P0 unmet was 18.7%. After, 0.36%. Day-4/5 penalty numbers are the plant-bug record.
+- **Dwell × tariff.** On energy cost, charging intelligence pays when median dwell ≥ 5.2 h at spread factor 1 — below 2.6 h the right lever is compliance/capacity, not scheduling. The total bill stays penalty-dominated. Scenario analysis. Trace: `results/dwell_tariff_map.csv`.
+- **Sobol.** dwell_scale total-order index 0.91; dwell 0.91. The scheduler's marginal value is conditional on dwell_scale. Scenario analysis. Trace: `results/sobol_indices.csv`.
+- **Capacity dual.** Shadow price at binding hours ≈ $0.006/kW-epoch (ε=0.01, one day). Trace: `results/dlmp_summary.csv`.
 
 ## Where an LLM fits and where it doesn't
 

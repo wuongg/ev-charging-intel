@@ -220,11 +220,13 @@ def _extra_findings() -> list[str]:
         hours = row.get("median_dwell_h")
         below = row.get("below_h")
         if hours not in (None, "") and str(hours) != "nan":
+            kind = "energy cost" if "energy" in str(row.get("metric", "")) else "bill"
             lines.append(
-                f"- **Dwell × tariff.** Charging intelligence pays when median dwell "
-                f"≥ {_fmt(float(hours), 1)} h at spread factor 1 — below "
+                f"- **Dwell × tariff.** On {kind}, charging intelligence pays when "
+                f"median dwell ≥ {_fmt(float(hours), 1)} h at spread factor 1 — below "
                 f"{_fmt(float(below), 1)} h the right lever is compliance/capacity, "
-                f"not scheduling. Scenario analysis. Trace: `results/dwell_tariff_map.csv`."
+                f"not scheduling. The total bill stays penalty-dominated. "
+                f"Scenario analysis. Trace: `results/dwell_tariff_map.csv`."
             )
     sobol = _optional("sobol_indices.csv")
     if sobol is not None and sobol.height:
