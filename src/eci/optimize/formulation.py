@@ -1,4 +1,4 @@
-"""Time-indexed LP. Continuous power and unmet energy. No binaries, no peak epigraph."""
+"""Time-indexed LP. Continuous power and unmet energy. Optional peak epigraph."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import numpy as np
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, hstack, vstack
 
 from eci.optimize.state import FleetState
 
@@ -43,10 +43,12 @@ def build_lp(
     dt_hours: float,
     penalty_unmet: float,
     slot_starts: list[datetime],
+    peak_weight: float = 0.0,
 ) -> dict:
-    """Decision vector is p[i, t] then unmet[i].
+    """Decision vector is p[i, t] then unmet[i], then optional peak kW.
 
     Cap rows come first so their duals are the leading inequality marginals.
+    When ``peak_weight`` > 0, n_t peak-epigraph rows follow the cap rows.
     """
     vehicles = state.vehicles
     n_i = len(vehicles)
@@ -100,14 +102,37 @@ def build_lp(
         cons_lb[energy_row] = max(vehicle.energy_remaining_kwh, 0.0)
         cons_ub[energy_row] = np.inf
         cons_ub[battery_row] = max(vehicle.battery_max_kwh, 0.0)
+    matrix = csr_matrix((data, (rows, cols)), shape=(n_con, n_var))
+    n_peak_rows = 0
+    if peak_weight > 0:
+        peak_nnz = n_i * n_t + n_t
+        peak_r = np.empty(peak_nnz, dtype=np.int32)
+        peak_c = np.empty(peak_nnz, dtype=np.int32)
+        peak_v = np.empty(peak_nnz, dtype=float)
+        peak_r[: n_i * n_t] = np.tile(np.arange(n_t, dtype=np.int32), n_i)
+        peak_c[: n_i * n_t] = col_idx
+        peak_v[: n_i * n_t] = 1.0
+        peak_r[n_i * n_t :] = np.arange(n_t, dtype=np.int32)
+        peak_c[n_i * n_t :] = n_var
+        peak_v[n_i * n_t :] = -1.0
+        epigraph = csr_matrix((peak_v, (peak_r, peak_c)), shape=(n_t, n_var + 1))
+        matrix = vstack([hstack([matrix, csr_matrix((n_con, 1))]), epigraph], format="csr")
+        c = np.append(c, float(peak_weight))
+        lb = np.append(lb, 0.0)
+        ub = np.append(ub, cap_kw)
+        cons_lb = np.append(cons_lb, np.full(n_t, -np.inf))
+        cons_ub = np.append(cons_ub, np.zeros(n_t))
+        n_peak_rows = n_t
     return {
         "c": c,
         "lb": lb,
         "ub": ub,
-        "matrix": csr_matrix((data, (rows, cols)), shape=(n_con, n_var)),
+        "matrix": matrix,
         "cons_lb": cons_lb,
         "cons_ub": cons_ub,
         "n_cap_rows": n_t,
+        "n_peak_rows": n_peak_rows,
         "n_i": n_i,
         "n_t": n_t,
+        "n_var": n_var,
     }

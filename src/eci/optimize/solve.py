@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy.optimize import Bounds, LinearConstraint, milp
+from scipy.optimize import Bounds, LinearConstraint, linprog, milp
+from scipy.sparse import vstack
 
 from eci.optimize.formulation import build_lp
 from eci.optimize.state import FleetState, Schedule
@@ -16,6 +17,7 @@ def solve_epoch(
     cap_kw: float,
     dt_hours: float,
     penalty_unmet: float,
+    peak_weight: float = 0.0,
 ) -> Schedule:
     """Rates, status, and cap-row duals. An empty fleet is a zero schedule."""
     n_t = len(slot_starts)
@@ -30,25 +32,34 @@ def solve_epoch(
             dt_hours=dt_hours,
             status="empty",
             cap_duals=np.zeros(n_t),
+            peak_duals=np.zeros(n_t),
         )
-    built = build_lp(state, np.asarray(prices, dtype=float), cap_kw, dt_hours, penalty_unmet, slot_starts)
-    result = milp(
-        built["c"],
-        integrality=np.zeros(built["c"].shape[0]),
-        bounds=Bounds(built["lb"], built["ub"]),
-        constraints=LinearConstraint(built["matrix"], built["cons_lb"], built["cons_ub"]),
-        options={"disp": False, "time_limit": 60},
+    built = build_lp(
+        state,
+        np.asarray(prices, dtype=float),
+        cap_kw,
+        dt_hours,
+        penalty_unmet,
+        slot_starts,
+        peak_weight=peak_weight,
     )
+    if peak_weight > 0:
+        result, cap_duals, peak_duals = _linprog_with_duals(built)
+    else:
+        result = milp(
+            built["c"],
+            integrality=np.zeros(built["c"].shape[0]),
+            bounds=Bounds(built["lb"], built["ub"]),
+            constraints=LinearConstraint(built["matrix"], built["cons_lb"], built["cons_ub"]),
+            options={"disp": False, "time_limit": 60},
+        )
+        cap_duals, peak_duals = _milp_duals(result, built)
     if not result.success or result.x is None:
-        raise RuntimeError(f"LP epoch failed: {result.message}")
+        raise RuntimeError(f"LP epoch failed: {getattr(result, 'message', 'linprog')}")
     n_i = built["n_i"]
     n_t = built["n_t"]
     power = result.x[: n_i * n_t].reshape(n_i, n_t)
-    unmet = result.x[n_i * n_t :]
-    marginals = getattr(getattr(result, "ineqlin", None), "marginals", None)
-    cap_duals = None
-    if marginals is not None and len(marginals) >= n_t:
-        cap_duals = np.asarray(marginals[:n_t], dtype=float)
+    unmet = result.x[n_i * n_t : n_i * n_t + n_i]
     return Schedule(
         vehicle_ids=[vehicle.vehicle_id for vehicle in state.vehicles],
         slot_starts=list(slot_starts),
@@ -59,7 +70,68 @@ def solve_epoch(
         dt_hours=dt_hours,
         status=str(result.message),
         cap_duals=cap_duals,
+        peak_duals=peak_duals,
     )
+
+
+def _milp_duals(result, built: dict) -> tuple[np.ndarray | None, np.ndarray | None]:
+    n_t = built["n_t"]
+    n_i = built["n_i"]
+    marginals = getattr(getattr(result, "ineqlin", None), "marginals", None)
+    cap_duals = None
+    peak_duals = None
+    if marginals is not None and len(marginals) >= n_t:
+        cap_duals = np.asarray(marginals[:n_t], dtype=float)
+        peak_start = n_t + 2 * n_i
+        if built.get("n_peak_rows") and len(marginals) >= peak_start + n_t:
+            peak_duals = np.asarray(marginals[peak_start : peak_start + n_t], dtype=float)
+    return cap_duals, peak_duals
+
+
+def _linprog_with_duals(built: dict):
+    """HiGHS linprog so cap duals exist when the peak epigraph is on."""
+    matrix = built["matrix"].tocsr()
+    blocks = []
+    rhs = []
+    cap_idx = []
+    peak_idx = []
+    n_t = built["n_t"]
+    n_peak = int(built.get("n_peak_rows") or 0)
+    peak_start = matrix.shape[0] - n_peak if n_peak else matrix.shape[0]
+    row_out = 0
+    for i in range(matrix.shape[0]):
+        lo = built["cons_lb"][i]
+        hi = built["cons_ub"][i]
+        if np.isfinite(hi):
+            if i < n_t:
+                cap_idx.append(row_out)
+            if n_peak and i >= peak_start:
+                peak_idx.append(row_out)
+            blocks.append(matrix.getrow(i))
+            rhs.append(hi)
+            row_out += 1
+        if np.isfinite(lo):
+            blocks.append(-matrix.getrow(i))
+            rhs.append(-lo)
+            row_out += 1
+    a_ub = vstack(blocks, format="csr") if blocks else None
+    result = linprog(
+        built["c"],
+        A_ub=a_ub,
+        b_ub=np.asarray(rhs, dtype=float) if rhs else None,
+        bounds=list(zip(built["lb"], built["ub"], strict=True)),
+        method="highs",
+    )
+    marginals = getattr(getattr(result, "ineqlin", None), "marginals", None)
+    cap_duals = np.zeros(n_t)
+    peak_duals = np.zeros(n_t) if n_peak else None
+    if marginals is not None:
+        for slot, index in enumerate(cap_idx):
+            cap_duals[slot] = float(marginals[index])
+        if peak_duals is not None:
+            for slot, index in enumerate(peak_idx):
+                peak_duals[slot] = float(marginals[index])
+    return result, cap_duals, peak_duals
 
 
 def solve_epoch_fast(

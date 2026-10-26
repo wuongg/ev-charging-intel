@@ -151,11 +151,20 @@ class MPCLoop:
             running_peak = max(running_peak, peak_now)
             slot_cost = float(np.sum(committed[:, epoch : epoch + k] * dt * prices_all[epoch : epoch + k]))
             epoch_costs.append(slot_cost + extra_cost)
-            if schedule.cap_duals is not None:
+            if schedule.cap_duals is not None or schedule.peak_duals is not None:
                 dual_log.append(
                     {
                         "epoch": now.isoformat(),
-                        "cap_duals": [float(value) for value in np.asarray(schedule.cap_duals)[:k]],
+                        "cap_duals": (
+                            [float(value) for value in np.asarray(schedule.cap_duals)[:k]]
+                            if schedule.cap_duals is not None
+                            else []
+                        ),
+                        "peak_duals": (
+                            [float(value) for value in np.asarray(schedule.peak_duals)[:k]]
+                            if schedule.peak_duals is not None
+                            else []
+                        ),
                     }
                 )
             epoch += k

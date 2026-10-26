@@ -42,6 +42,7 @@ class Schedule:
     dt_hours: float
     status: str
     cap_duals: np.ndarray | None = None
+    peak_duals: np.ndarray | None = None
     epoch_duals: list[dict] = field(default_factory=list)
 
     def costs(self, penalty_unmet: float) -> tuple[float, float, float]:

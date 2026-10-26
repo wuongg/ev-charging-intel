@@ -1,0 +1,2 @@
+metric,epsilon,value,n_binding,n_slots,day,git_sha,config_hash,data_hash,utc_now
+mean_abs_peak_dual_binding,0.01,0.005766635338775432,38,62,2019-07-01,d391929454d0821f9b36ee9755ac6cbf4f1c57f5-dirty,e77f8225685ae120c83edce5e885d41e25fe8b9b934f1650df383a8fe414a30b,3bca5d4970f1e47224c42b10f19116f84161cec7637a7ca615c538022bf420c2,2026-10-26T07:11:20Z
