@@ -1,6 +1,6 @@
 # EV Fleet Charging Intelligence
 
-Workplace charging: trusting a raw deadline on SCE at M=25 costs 284.3% of the charge-on-arrival bill ($103,995 per scenario year); a hazard-corrected deadline (T2C, held-out sessions, β=0.5) still costs 488.6% — that remainder is what truthful departure information is worth.
+Workplace charging: a raw declared deadline on SCE at M=25 costs 284.3% of the charge-on-arrival bill ($103,995 per scenario year); the best non-oracle planning assumption (β=0.25 of empirical actual dwell) still costs 182.3% — actual departure information is worth more than any single tariff line item.
 
 ![VOI raw T2 vs T2C](plots/voi_corrected.png)
 
@@ -30,8 +30,8 @@ M-rescore of the same T2C power: 108.3% at M=10, 249.3% at M=25, 704.5% at M=100
 ## Findings
 
 - **Trust contract.** Median declared dwell is 0.29 h *shorter* than the stay; 37.5% of sessions declare *later*. T2C fits actual dwell given hour and declared-gap bucket on the complementary session fold. β=0.5 was not moved to shrink VOI. Sensitivity β in {0.25, 0.5, 0.75} is in `results/voi_corrected_summary.csv`.
-- **VOI.** Raw T2 is 284.3% of P0 on SCE M=25. After T2C it is 488.6% (T2C at β=0.5 did not shrink VOI: hour-only actual p50 is later than T2v2, so cheapest-slot waits more. β was not moved). Deadline still dominates energy on the declared-input split (`results/voi_ablation_summary.csv`).
-- **Inverted dial.** T2C unmet at β=0.25 / 0.5 / 0.75 is 3.2% / 7.9% / 15.5%. A longer belief still lets cheapest-slot wait after the car has left. High β is not safer.
+- **VOI.** Raw declared pays 284.3% of P0 on SCE M=25. The best non-oracle planning assumption (β=0.25 of the empirical actual-departure distribution) still pays 182.3% (M=10: 84.5%). Median actual (β=0.5) pays 488.6% because that point is the wrong place on the dial; the dial needs a low β. Trace: `results/voi_corrected_summary.csv`. ADR-004.
+- **Risk knob.** Safety here is assuming little time. T2C unmet at β=0.25 / 0.5 / 0.75 is 3.2% / 7.9% / 15.5%. A longer belief lets cheapest-slot wait after the car has left.
 - **Negative result.** P3 matches P1 whenever 150 kW does not bind. Tightest cell 60 kW ×4: LP cheaper than greedy by 12247 (p=6.4e-15). No cell in the grid saves 1% versus greedy as a break-even cap.
 - **Plant semantics.** Before I9, P0 unmet was 18.7%. After, 0.36%. Day-4/5 penalty numbers are the plant-bug record.
 
@@ -49,7 +49,7 @@ Fits: tariff YAML from a PDF, the 90-second narrative, eval harnesses, feature i
 
 ## Three interview numbers
 
-1. VOI SCE M=25: 284.3% raw T2 → 488.6% after T2C.
+1. VOI SCE M=25: 284.3% raw declared; 182.3% at β=0.25 (best non-oracle).
 2. Minimum site cap that serves the bank years: 79.6 kW (mean year); 84.7 kW serves every bank day.
 3. P0 unmet 18.7% → 0.36% after the plant was the plug, not the belief (I9).
 

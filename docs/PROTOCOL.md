@@ -73,3 +73,7 @@ A declared deadline is not the physical unplug. On the 1,195 Caltech 2018 sessio
 T2C replaces the believed deadline with the β-quantile of actual dwell in the same Los Angeles hour and declared-dwell bucket. β = 0.5 is the default and is not moved to shrink VOI. Sessions are hashed into two folds; a session is scored with the fold that was not fit on it. Energy stays `kWhDelivered`. The plant is still the recorded disconnect (I9). Predictions for the T2C runs were written to `results/day7_predictions.csv` before those runs.
 
 Outcomes are in `results/voi_corrected_summary.csv`, `results/reproduction_v4.csv`, and `results/t2c_dial.csv`. β was not moved after those files were written. On the 2019 bank there is no declared window, so T2C falls back to the hour-of-day actual quantile. If the v4 gap is outside 1–15%, reproduction stops: published 9.2% assumes realistic user inputs, and the delta is the finding.
+
+## Day 8 scenario analysis (amendment after `v0.7-week1-frozen`)
+
+The dwell × tariff map, Sobol indices, and ε-peak front scale dwell, tariff spread, utilization, and M on the frozen bank. Actual disconnect and believed deadline are scaled together. These runs are labeled scenario analysis in the CSV `note` column. They are not measurements of Caltech 2019. β default, M headline, k, and the embargo stay frozen. Interpretation of the Day-7 β grid is ADR-004.

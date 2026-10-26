@@ -110,11 +110,12 @@ def build_readme(ctx: dict) -> str:
         [
             "# EV Fleet Charging Intelligence",
             "",
-            f"Workplace charging: trusting a raw deadline on SCE at M=25 costs "
+            f"Workplace charging: a raw declared deadline on SCE at M=25 costs "
             f"{ctx['voi_raw_pct']} of the charge-on-arrival bill "
-            f"({ctx['voi_raw_usd']} per scenario year); a hazard-corrected deadline "
-            f"(T2C, held-out sessions, β=0.5) still costs {ctx['voi_t2c_pct']} — "
-            f"that remainder is what truthful departure information is worth.",
+            f"({ctx['voi_raw_usd']} per scenario year); the best non-oracle planning "
+            f"assumption (β=0.25 of empirical actual dwell) still costs "
+            f"{ctx['voi_low_pct']} — actual departure information is worth more than "
+            f"any single tariff line item.",
             "",
             "![VOI raw T2 vs T2C](plots/voi_corrected.png)",
             "",
@@ -149,17 +150,22 @@ def build_readme(ctx: dict) -> str:
             "37.5% of sessions declare *later*. T2C fits actual dwell given hour and "
             "declared-gap bucket on the complementary session fold. β=0.5 was not moved "
             "to shrink VOI. Sensitivity β in {0.25, 0.5, 0.75} is in `results/voi_corrected_summary.csv`.",
-            f"- **VOI.** Raw T2 is {ctx['voi_raw_pct']} of P0 on SCE M=25. After T2C it is "
-            f"{ctx['voi_t2c_pct']} ({ctx['voi_note']}). Deadline still dominates energy on the "
-            "declared-input split (`results/voi_ablation_summary.csv`).",
-            f"- **Inverted dial.** T2C unmet at β=0.25 / 0.5 / 0.75 is "
-            f"{ctx['dial25']} / {ctx['dial50']} / {ctx['dial75']}. A longer belief still lets "
-            "cheapest-slot wait after the car has left. High β is not safer.",
+            f"- **VOI.** Raw declared pays {ctx['voi_raw_pct']} of P0 on SCE M=25. "
+            f"The best non-oracle planning assumption (β=0.25 of the empirical "
+            f"actual-departure distribution) still pays {ctx['voi_low_pct']} "
+            f"(M=10: {ctx['voi_low_m10_pct']}). Median actual (β=0.5) pays "
+            f"{ctx['voi_t2c_pct']} because that point is the wrong place on the dial; "
+            f"the dial needs a low β. Trace: `results/voi_corrected_summary.csv`. "
+            f"ADR-004.",
+            f"- **Risk knob.** Safety here is assuming little time. T2C unmet at "
+            f"β=0.25 / 0.5 / 0.75 is {ctx['dial25']} / {ctx['dial50']} / {ctx['dial75']}. "
+            f"A longer belief lets cheapest-slot wait after the car has left.",
             "- **Negative result.** P3 matches P1 whenever 150 kW does not bind. Tightest "
             f"cell 60 kW ×4: LP cheaper than greedy by {_fmt(ctx['cap_diff'], 0)} (p={ctx['cap_p']}). "
             "No cell in the grid saves 1% versus greedy as a break-even cap.",
             f"- **Plant semantics.** Before I9, P0 unmet was {ctx['p0_before']}. After, "
             f"{ctx['p0_after']}. Day-4/5 penalty numbers are the plant-bug record.",
+            *ctx["extra_findings"],
             "",
             "## Where an LLM fits and where it doesn't",
             "",
@@ -180,7 +186,8 @@ def build_readme(ctx: dict) -> str:
             "",
             "## Three interview numbers",
             "",
-            f"1. VOI SCE M=25: {ctx['voi_raw_pct']} raw T2 → {ctx['voi_t2c_pct']} after T2C.",
+            f"1. VOI SCE M=25: {ctx['voi_raw_pct']} raw declared; "
+            f"{ctx['voi_low_pct']} at β=0.25 (best non-oracle).",
             f"2. Minimum site cap that serves the bank years: {ctx['cap_mean']} kW (mean year); "
             f"{ctx['cap_max']} kW serves every bank day.",
             f"3. P0 unmet {ctx['p0_before']} → {ctx['p0_after']} after the plant was the plug, "
@@ -200,6 +207,47 @@ def build_readme(ctx: dict) -> str:
     )
 
 
+def _optional(name: str) -> pl.DataFrame | None:
+    path = REPO_ROOT / "results" / name
+    return pl.read_csv(path) if path.exists() else None
+
+
+def _extra_findings() -> list[str]:
+    lines: list[str] = []
+    even = _optional("dwell_tariff_break_even.csv")
+    if even is not None and even.height:
+        row = even.row(0, named=True)
+        hours = row.get("median_dwell_h")
+        below = row.get("below_h")
+        if hours not in (None, "") and str(hours) != "nan":
+            lines.append(
+                f"- **Dwell × tariff.** Charging intelligence pays when median dwell "
+                f"≥ {_fmt(float(hours), 1)} h at spread factor 1 — below "
+                f"{_fmt(float(below), 1)} h the right lever is compliance/capacity, "
+                f"not scheduling. Scenario analysis. Trace: `results/dwell_tariff_map.csv`."
+            )
+    sobol = _optional("sobol_indices.csv")
+    if sobol is not None and sobol.height:
+        ranked = sobol.sort("ST", descending=True)
+        top = ranked.row(0, named=True)
+        dwell = ranked.filter(pl.col("factor") == "dwell_scale")
+        dwell_st = float(dwell["ST"][0]) if dwell.height else float("nan")
+        lines.append(
+            f"- **Sobol.** {top['factor']} total-order index {float(top['ST']):.2f}; "
+            f"dwell {dwell_st:.2f}. The scheduler's marginal value is conditional on "
+            f"{top['factor']}. Scenario analysis. Trace: `results/sobol_indices.csv`."
+        )
+    dlmp = _optional("dlmp_summary.csv")
+    if dlmp is not None and dlmp.height:
+        shadow = float(dlmp["value"][0])
+        lines.append(
+            f"- **Capacity dual.** Shadow price at binding hours ≈ "
+            f"${_fmt(shadow, 3)}/kW-epoch (ε=0.01, one day). "
+            f"Trace: `results/dlmp_summary.csv`."
+        )
+    return lines
+
+
 def context() -> dict:
     v4s = _csv("metrics_v4_summary.csv").filter(pl.col("tariff") == "sce_ev4").sort("policy")
     table = []
@@ -211,6 +259,8 @@ def context() -> dict:
         )
     voi_raw = _row(_csv("voi_summary.csv"), tariff="sce_ev4", M=25.0)
     voi_c = _row(_csv("voi_corrected_summary.csv"), tariff="sce_ev4", M=25.0, beta=0.5)
+    voi_low = _row(_csv("voi_corrected_summary.csv"), tariff="sce_ev4", M=25.0, beta=0.25)
+    voi_low_m10 = _row(_csv("voi_corrected_summary.csv"), tariff="sce_ev4", M=10.0, beta=0.25)
     frac = float(voi_c["mean_fraction"])
     repro = _csv("reproduction.csv")
     v4 = _csv("reproduction_v4.csv")
@@ -224,18 +274,10 @@ def context() -> dict:
         "voi_raw_usd": _money(float(voi_raw["mean_voi"])),
         "voi_t2c_pct": _pct(frac),
         "voi_t2c_usd": _money(float(voi_c["mean_voi"])),
-        "voi_note": (
-            "under the 50% target"
-            if frac < 0.5
-            else (
-                "correction helps but information is still worth this share of the bill"
-                if frac < float(voi_raw["mean_fraction"])
-                else (
-                    "T2C at β=0.5 did not shrink VOI: hour-only actual p50 is later "
-                    "than T2v2, so cheapest-slot waits more. β was not moved"
-                )
-            )
-        ),
+        "voi_low_pct": _pct(float(voi_low["mean_fraction"])),
+        "voi_low_m10_pct": _pct(float(voi_low_m10["mean_fraction"])),
+        "voi_note": "median actual is the wrong point on the risk dial; the dial needs low β",
+        "extra_findings": _extra_findings(),
         "v1_gap": _repro_value(repro, "pscc_gap_p3_t2_vs_p4_t3"),
         "v2_gap": _repro_value(_csv("reproduction_v2.csv"), "pscc_v2_declared_departure"),
         "v3_gap": _repro_value(_csv("reproduction_v3.csv"), "pscc_v3_plant_actual"),
@@ -290,10 +332,17 @@ def build_report(ctx: dict) -> str:
             "",
             f"Raw T2, SCE M=25: {ctx['voi_raw_pct']} of the P0 bill "
             f"(mean {ctx['voi_raw_usd']}).",
-            f"T2C β=0.5, SCE M=25: {ctx['voi_t2c_pct']} of the P0 bill "
-            f"(mean {ctx['voi_t2c_usd']}). {ctx['voi_note']}.",
+            f"T2C β=0.25, SCE M=25: {ctx['voi_low_pct']} of the P0 bill. "
+            f"β=0.5 (median) is {ctx['voi_t2c_pct']}. {ctx['voi_note']}.",
             "",
-            "Beta grid rows are in `results/voi_corrected_summary.csv`.",
+            "Beta grid rows are in `results/voi_corrected_summary.csv`. ADR-004.",
+            "",
+            "## What I learned from being wrong",
+            "",
+            "Day-7 predictions missed all three bands. The misses share one mechanism: "
+            "the bill is unmet × M plus a demand charge, so a longer believed window "
+            "raises penalty share instead of ToU savings. I treated β=0.5 as a "
+            "calibration target; it is a risk knob, and the safe side is low β.",
             "",
             "## Reproduction",
             "",
