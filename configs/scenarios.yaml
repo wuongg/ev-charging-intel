@@ -1,4 +1,16 @@
 # Scenario-bank spec from the design doc. The bank itself is not built on day 1.
 k: 50
 utilization_grid: [1, 2, 4, 8]
-# TODO: dwell grid, congestion arms, VN axes S1–S5
+# S1 parameters are assumed, calibrated to public reports of VN grid events
+# (2023 N-burnout, 2024 Yagi, 2025-26 peak records). Not a measurement.
+S1:
+  p_dry: 0.08
+  p_wet: 0.03
+  dur_lognorm_mu: 0.7
+  dur_lognorm_sigma: 0.4
+  duration_min_h: 1.0
+  duration_max_h: 6.0
+  peak_hour_multiplier: 2.5
+  peak_hours: [17, 18, 19, 20, 21]
+  seed: 9
+  note: "assumed, calibrated to public reports of VN grid events (2023 N-burnout, 2024 Yagi, 2025-26 peak records)"
