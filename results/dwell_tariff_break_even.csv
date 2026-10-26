@@ -1,0 +1,2 @@
+metric,dwell_scale,median_dwell_h,below_h,found,base_median_h,n_flags,n_energy_flags,n_cells,git_sha,config_hash,data_hash,utc_now
+mean_energy_reduction_vs_p0,1.0,5.2025,2.60125,True,5.2025,12,2,24,e28a1887a37f1c6f74b1a7dab75b256493470589-dirty,e77f8225685ae120c83edce5e885d41e25fe8b9b934f1650df383a8fe414a30b,3bca5d4970f1e47224c42b10f19116f84161cec7637a7ca615c538022bf420c2,2026-10-26T06:11:45Z
