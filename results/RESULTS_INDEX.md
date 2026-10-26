@@ -37,3 +37,4 @@ Every headline below is a column in the named file. Regenerated numbers live in 
 | `drift_twente.csv` | PSI/KS monthly windows | `detection_delay_months`=0; `false_triggers`=9; `source`=acn_2018_2020_proxy (Twente NC unreachable) |
 | `retrain_demo.csv` | 14-day pinball-ratio trigger | `improvement_pct`=67.76 after refit; `trigger_day`=2020-03-29 |
 | `vn_outage_demo.csv` | S1 Bernoulli outage on/off | P0 unmet_kwh 38.84 → 89.02; `outage_hours_served_missed`=11; `i1_ok`=True; params assumed |
+| `vlm_mining_eval.csv` | VLM satellite, self-labeled n=20 | per `case_type` precision/recall; `hallucination_rate`; heuristic backend |
