@@ -46,20 +46,6 @@ M-rescore of the same T2C power: 108.3% at M=10, 249.3% at M=25, 704.5% at M=100
 
 Fits: tariff YAML, the 90-second script, eval harnesses. Does not fit: the MPC, plant gate, leakage control, freeze hashes, or any README number (`scripts/make_report.py` from `results/*.csv`).
 
-## Skills → roles
-
-| skill shown here | maps to |
-|---|---|
-| LLM + eval + forecasting (rolling-origin, embargo, pinball) | VinSmart Future |
-| constraint opt, edge replay, 15-min MPC, min-cost-flow satellite | VinFast |
-| drift, freeze gates, MLOps, time-series regime split | VinDynamics |
-
-## Three interview numbers
-
-1. VOI SCE M=25: 284.3% raw declared; 182.3% at β=0.25 (best non-oracle).
-2. Minimum site cap that serves the bank years: 79.6 kW (mean year); 84.7 kW serves every bank day.
-3. P0 unmet 18.7% → 0.36% after the plant was the plug, not the belief (I9).
-
 ## Reproduce
 
 ```bash
